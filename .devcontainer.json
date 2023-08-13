@@ -33,7 +33,7 @@
           }
         ]
       },
-      "extensions": ["mads-hartmann.bash-ide-vscode", "esbenp.prettier-vscode"]
+      "extensions": ["mads-hartmann.bash-ide-vscode", "esbenp.prettier-vscode", "GitHub.vscode-github-actions"]
     }
   },
   "remoteUser": "node",
