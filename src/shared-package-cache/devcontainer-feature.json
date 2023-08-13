@@ -1,0 +1,40 @@
+{
+  "name": "Shared Package Cache",
+  "id": "shared-package-cache",
+  "version": "0.1.0",
+  "description": "Shares package caches between devcontainers",
+  "options": {
+    "go": {
+      "type": "boolean",
+      "default": true,
+      "description": "Golang use the shared package cache volume"
+    },
+    "npm": {
+      "type": "boolean",
+      "default": true,
+      "description": "NPM use the shared package cache volume"
+    },
+    "cachedir": {
+      "type": "string",
+      "default": "/var/package-cache",
+      "description": "The cache folder should point to a volume that is shared among different devcontainers"
+    }
+  },
+  "mounts": [
+    {
+      "source": "devcontainer-shared-package-cache",
+      "target": "/var/package-cache",
+      "type": "volume"
+    }
+  ],
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils",
+    "ghcr.io/devcontainers/features/go",
+    "ghcr.io/devcontainers/features/node",
+    "ghcr.io/guiyomh/features/golangci-lint",
+    "ghcr.io/guiyomh/features/goreleaser",
+    "ghcr.io/devcontainers-contrib/features/typescript",
+    "ghcr.io/jayree/devcontainer-features/npm-registry"
+  ],
+  "entrypoint": "/usr/local/share/shared-package-cache-init.sh"
+}

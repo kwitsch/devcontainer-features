@@ -1,0 +1,66 @@
+{
+  "go-disabled": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/devcontainers/features/go": {},
+      "shared-package-cache": {
+        "go": false,
+        "npm": false,
+        "cachedir": "/tmp/package-cache"
+      }
+    }
+  },
+  "go-enabled": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/devcontainers/features/go": {},
+      "shared-package-cache": {
+        "go": true,
+        "npm": false,
+        "cachedir": "/tmp/package-cache"
+      }
+    }
+  },
+  "go-missing": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "shared-package-cache": {
+        "go": true,
+        "npm": false,
+        "cachedir": "/tmp/package-cache"
+      }
+    }
+  },
+  "npm-disabled": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/devcontainers/features/node": {},
+      "shared-package-cache": {
+        "go": false,
+        "npm": false,
+        "cachedir": "/tmp/package-cache"
+      }
+    }
+  },
+  "npm-enabled": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "ghcr.io/devcontainers/features/node": {},
+      "shared-package-cache": {
+        "go": false,
+        "npm": true,
+        "cachedir": "/tmp/package-cache"
+      }
+    }
+  },
+  "npm-missing": {
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+    "features": {
+      "shared-package-cache": {
+        "go": false,
+        "npm": true,
+        "cachedir": "/tmp/package-cache"
+      }
+    }
+  }
+}
