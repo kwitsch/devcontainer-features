@@ -1,9 +1,15 @@
 #!/bin/bash
 set -e
-USERNAME="${USERNAME:-"${_REMOTE_USER:-"automatic"}"}"
-CACHEDIR="${CACHEDIR:-"/var/package-cache"}"
 GO_ENABLED="${GO:-"true"}"
 NPM_ENABLED="${NPM:-"true"}"
+USERNAME="${USERNAME:-"${_REMOTE_USER:-"automatic"}"}"
+USERGROUP="package_cache_group"
+USERNAMEANDGROUP="${USERNAME}:${USERGROUP}"
+CACHE_DIR="${CACHEDIR:-"/var/package-cache"}"
+GO_DIR="${CACHE_DIR}/go"
+NPM_DIR="${CACHE_DIR}/npm"
+
+echo "${CACHEDIR} vs ${CACHE_DIR}"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo -e 'Script must be run as root. Use sudo, su, or add "USER root" to your Dockerfile before running this script.'
@@ -26,7 +32,7 @@ elif [ "${USERNAME}" = "none" ] || ! id -u "${USERNAME}" > /dev/null 2>&1; then
   USERNAME=root
 fi
 
-groupadd -f package_cache_group
+groupadd -f "${USERGROUP}"
 
 tee /usr/local/share/shared-package-cache-init.sh > /dev/null \
 << EOF
@@ -42,17 +48,18 @@ sudoIf()
   fi
 }
 
-if [ ! -d "${CACHEDIR}" ]; then
-  sudoIf mkdir -p "${CACHEDIR}"
+if [ ! -d "${CACHE_DIR}" ]; then
+  sudoIf mkdir -p "${CACHE_DIR}"
 fi
 
 if [ "${GO_ENABLED}" == "true" ]; then
   if type go &> /dev/null; then
     echo "Activating GO mod cache sharing"
-    if [ ! -d "${CACHEDIR}/go" ]; then
-      sudoIf mkdir -p "${CACHEDIR}/go"
+    if [ ! -d "${GO_DIR}" ]; then
+      sudoIf mkdir -p "${GO_DIR}"
     fi
-    sudoIf ln -sf "${GOPATH}/pkg/mod" "${CACHEDIR}/go"
+    sudoIf chown -R "${USERNAMEANDGROUP}" "${GO_DIR}"
+    sudoIf ln -sf "${GOPATH}/pkg/mod" "${GO_DIR}"
   else
     echo "Go mod cache sharing is disabled since Go is not installed"
   fi
@@ -61,10 +68,11 @@ fi
 if [ "${NPM_ENABLED}" == "true" ]; then
   if type npm &> /dev/null; then
     echo "Activating NPM package cache sharing"
-    if [ ! -d "${CACHEDIR}/npm" ]; then
-      mkdir -p "${CACHEDIR}/npm"
+    if [ ! -d "${NPM_DIR}" ]; then
+      sudoIf mkdir -p "${NPM_DIR}"
     fi
-    npm config set cache "${CACHEDIR}/npm" --global
+    sudoIf chown -R "${USERNAMEANDGROUP}" "${NPM_DIR}"
+    npm config set cache "${NPM_DIR}" --global
   else
     echo "Npm package cache sharing is disabled since Npm is not installed"
   fi
@@ -72,12 +80,11 @@ else
   echo "NPM package cache sharing is disabled"
 fi
 
-sudoIf chgrp -R package_cache_group "${CACHEDIR}"
-sudoIf chmod g+rw "${CACHEDIR}"
+sudoIf chmod g+rw "${CACHE_DIR}"
 
 set +e
 exec "\$@"
 EOF
 
 chmod +x /usr/local/share/shared-package-cache-init.sh
-chown "${USERNAME}":root /usr/local/share/shared-package-cache-init.sh
+chown "${USERNAMEANDGROUP}" /usr/local/share/shared-package-cache-init.sh

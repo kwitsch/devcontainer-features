@@ -1,7 +1,7 @@
 {
   "name": "Shared Package Cache",
   "id": "shared-package-cache",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Shares package caches between devcontainers",
   "options": {
     "go": {
