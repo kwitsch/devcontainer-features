@@ -7,7 +7,7 @@ Shares package caches between devcontainers
 
 ```json
 "features": {
-    "ghcr.io/kwitsch/devcontainer-features/shared-package-cache:0": {}
+    "ghcr.io/kwitsch/devcontainer-features/shared-package-cache:1": {}
 }
 ```
 
