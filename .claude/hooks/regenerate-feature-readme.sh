@@ -43,7 +43,7 @@ hash_before=""
 
 echo "regenerate-feature-readme: regenerating Feature docs for '$feature_name' (namespace: $namespace) via npx" >&2
 if ! npx --yes -p @devcontainers/cli devcontainer features generate-docs \
-      --project-folder . --namespace "$namespace" >&2; then
+      --project-folder ./src --namespace "$namespace" >&2; then
   echo "regenerate-feature-readme: 'devcontainer features generate-docs' failed." >&2
   exit 1
 fi
