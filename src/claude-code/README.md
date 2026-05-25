@@ -59,6 +59,16 @@ The `${localEnv:HOME}${localEnv:USERPROFILE}` concatenation resolves to the user
 
 For the bind mounts to resolve, the host user must have **logged into Claude Code at least once** on the host machine, so that the source paths exist.
 
+### Windows hosts: use Remote-WSL
+
+If your host is Windows and Claude Code is installed inside a WSL2 distro (the typical setup — Claude Code does not run natively on Windows), do **not** open the project with VS Code on Windows directly. The substitution above would resolve to `C:\Users\<you>\.claude.json`, which is empty. Instead:
+
+1. Install the [WSL extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) in VS Code.
+2. From Windows: `wsl` into your distro, `cd` to the project, run `code .` — VS Code reopens connected to WSL.
+3. *Reopen in Container* from there.
+
+In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude Code actually lives), Docker Desktop's WSL2 backend handles bind mounts as native Linux paths, and no additional host-side configuration is required. Features cannot run host-side scripts, so Windows-side symlink automation isn't possible from this Feature — Remote-WSL is the zero-config path.
+
 > **Mount mode is read-write at the OS level.** The `devContainerFeature.schema.json` for Feature manifests only accepts `{source, target, type}` Mount objects with `additionalProperties: false` — no `readonly` flag — so we cannot declare these mounts read-only from the Feature itself. The Feature's lifecycle scripts (`postCreate.sh`, `postStart.sh`) only ever *read* from `/host_claude/...`; they never write back. If you want a hard guarantee, override the mount in your own `devcontainer.json` with the docker-cli string form: `"source=...,target=/host_claude/...,type=bind,readonly"`.
 
 ### Platform-specific behavior
@@ -66,9 +76,9 @@ For the bind mounts to resolve, the host user must have **logged into Claude Cod
 | Host | Where Claude Code stores credentials | Works? |
 |---|---|---|
 | Linux | `~/.claude.json` + `~/.claude/.credentials.json` | ✅ |
-| Windows (native) | `%USERPROFILE%\.claude.json` + `%USERPROFILE%\.claude\` | ✅ |
-| WSL2 with Claude Code installed *inside* WSL | `~/.claude.json` in the WSL distro | ✅ |
-| WSL2 but Claude Code installed in *Windows* | `C:\Users\<you>\.claude.json` — **not** in WSL home | ❌ Requires symlinking `~/.claude.json` → `/mnt/c/Users/<you>/.claude.json` in WSL, or installing Claude Code inside WSL instead |
+| VS Code in Remote-WSL with Claude installed in the WSL distro | `~/.claude.json` in the WSL distro (`${localEnv:HOME}` = `/home/<wsl-user>`) | ✅ Recommended Windows path — see above |
+| VS Code on Windows + Claude in WSL2 distro | `~/.claude.json` in the WSL distro — **not** under `%USERPROFILE%` | ❌ Use Remote-WSL instead (the Feature cannot automate Windows-side symlinks from inside the container) |
+| VS Code on Windows + Claude installed natively on Windows | `%USERPROFILE%\.claude.json` + `%USERPROFILE%\.claude\` | ✅ Uncommon (Claude Code is not officially distributed for native Windows) |
 | macOS | OAuth tokens stored in **Keychain**, not in `~/.claude/` | ❌ Not supported by this Feature |
 | VS Code "Clone in Container Volume" on Windows | Source paths might not exist on the host filesystem | ❌ See [devcontainers/spec#335](https://github.com/devcontainers/spec/issues/335) |
 
