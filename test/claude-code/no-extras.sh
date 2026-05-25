@@ -10,8 +10,15 @@ TARGET_USER="$(awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /(nologin|false)$/ \
     { print $3":"$1 }' /etc/passwd | sort -n | head -n1 | cut -d: -f2)"
 TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
 
-check "settings.json NOT created when defaultMode is empty" \
-    bash -c "! test -f '${TARGET_HOME}/.claude/settings.json'"
+# `claude install` may create settings.json with its own defaults — that's
+# fine. The Feature contract is: when defaultMode="" we don't *touch* the
+# file, i.e. permissions.defaultMode must not be set by us.
+check "settings.json has no permissions.defaultMode when option is empty" \
+    bash -c "
+        if [ -f '${TARGET_HOME}/.claude/settings.json' ]; then
+            jq -e '(.permissions.defaultMode // null) == null' '${TARGET_HOME}/.claude/settings.json'
+        fi
+    "
 
 check ".claude.json has no remoteControlAtStartup when remoteControl=false" \
     bash -c "jq -e '(.remoteControlAtStartup // null) != true' \

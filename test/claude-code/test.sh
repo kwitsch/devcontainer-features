@@ -55,8 +55,11 @@ check "target user has home" test -d "$TARGET_HOME"
 check "claude launcher installed in target user home" \
     test -x "${TARGET_HOME}/.local/bin/claude"
 
-check "claude --version runs (as target user via su)" \
-    su - "$TARGET_USER" -c "command -v claude && claude --version"
+# Invoke the launcher directly — the test script may not run as root
+# (image metadata can pin remoteUser to a non-root account), in which
+# case `su -` would prompt for a password.
+check "claude launcher executes via direct path" \
+    "${TARGET_HOME}/.local/bin/claude" --version
 
 # --- postStart-Resultat: .claude.json patches -----------------------------
 # Default-Optionen: remoteControl=true, defaultMode=auto
