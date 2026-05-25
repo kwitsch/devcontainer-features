@@ -40,8 +40,12 @@ check "lifecycle: postStart.sh executable" \
     test -x /usr/local/share/claude-code/postStart.sh
 
 # --- PATH-Vererbung -------------------------------------------------------
-check "/opt/claude-code/bin removed from manifest (no leftover from v0.2)" \
-    bash -c '! grep -q "/opt/claude-code/bin" /etc/environment 2>/dev/null || true'
+# Negative assertion: the legacy /opt/claude-code/bin path (used in v0.2)
+# must not have leaked into /etc/environment. `! grep -q` returns success
+# iff the pattern is absent; if /etc/environment is missing, grep exits 2
+# and the negation still passes — which is the right outcome here.
+check "no /opt/claude-code/bin leftover in /etc/environment" \
+    bash -c '! grep -q "/opt/claude-code/bin" /etc/environment 2>/dev/null'
 
 # --- onCreate-Resultat: claude installiert pro User -----------------------
 # Resolver-Logik aus _lib.sh inline: erster non-root, login-faehiger User

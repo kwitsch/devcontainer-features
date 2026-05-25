@@ -23,7 +23,7 @@ Container lifecycle:
 
 ## Host requirements
 
-The Feature reads credentials from these read-only bind mounts (declared in `mounts`):
+The Feature declares these bind mounts:
 
 ```
 ${localEnv:HOME}${localEnv:USERPROFILE}/.claude.json  →  /host_claude/.claude.json
@@ -33,6 +33,8 @@ ${localEnv:HOME}${localEnv:USERPROFILE}/.claude       →  /host_claude/.claude
 The `${localEnv:HOME}${localEnv:USERPROFILE}` concatenation resolves to the user's home on Linux/macOS (where only `HOME` is set) and on Windows (where only `USERPROFILE` is set), per [VS Code's recommended cross-platform mount pattern](https://code.visualstudio.com/remote/advancedcontainers/add-local-file-mount).
 
 For the bind mounts to resolve, the host user must have **logged into Claude Code at least once** on the host machine, so that the source paths exist.
+
+> **Mount mode is read-write at the OS level.** The `devContainerFeature.schema.json` for Feature manifests only accepts `{source, target, type}` Mount objects with `additionalProperties: false` — no `readonly` flag — so we cannot declare these mounts read-only from the Feature itself. The Feature's lifecycle scripts (`postCreate.sh`, `postStart.sh`) only ever *read* from `/host_claude/...`; they never write back. If you want a hard guarantee, override the mount in your own `devcontainer.json` with the docker-cli string form: `"source=...,target=/host_claude/...,type=bind,readonly"`.
 
 ### Platform-specific behavior
 

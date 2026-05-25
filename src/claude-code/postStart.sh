@@ -19,38 +19,60 @@ HOST_DIR="${HOST_CLAUDE_MOUNT:-/host_claude}"
 HOST_CREDS="${HOST_DIR}/.claude/.credentials.json"
 HOST_JSON="${HOST_DIR}/.claude.json"
 
-# --- Prerequisites + Host-Validation --------------------------------------
-command -v jq >/dev/null 2>&1                                                 || { warn "jq not found — skipping"; exit 0; }
-[[ -r "$HOST_CREDS" ]]                                                        || { log  "no host credentials — skipping"; exit 0; }
-jq -e '.claudeAiOauth.accessToken and .claudeAiOauth.refreshToken' \
-   "$HOST_CREDS" >/dev/null 2>&1                                              || { warn "host credentials malformed — skipping"; exit 0; }
+# --- Prerequisites --------------------------------------------------------
+command -v jq >/dev/null 2>&1 || { warn "jq not found — skipping"; exit 0; }
 
 resolve_target_paths
 
-# --- (1) Credentials: kopieren wenn Host strikt neuer oder Container fehlt
-host_expires=$(jq -r '.claudeAiOauth.expiresAt // 0' "$HOST_CREDS")
+# Read a target-side JSON file, falling back to {} if missing or malformed.
+# Prevents `set -euo pipefail` from killing the script on a corrupted
+# .claude.json (manual edits, partial writes, etc.).
+read_json_or_empty() {
+    local f="$1"
+    if [[ -f "$f" ]] && jq -e . "$f" >/dev/null 2>&1; then
+        cat "$f"
+    else
+        printf '{}'
+    fi
+}
 
-if [[ ! -f "$TARGET_CREDS" ]]; then
-    log "no container credentials yet — installing from host"
-    install_for_target "$HOST_CREDS" "$TARGET_CREDS" 600
+# Validate host credentials once; downstream steps gate on this flag rather
+# than aborting the whole script — workspace trust and defaultMode below
+# do not depend on credentials and should still run when none are mounted.
+HOST_CREDS_OK=0
+if [[ -r "$HOST_CREDS" ]] && \
+   jq -e '.claudeAiOauth.accessToken and .claudeAiOauth.refreshToken' \
+        "$HOST_CREDS" >/dev/null 2>&1; then
+    HOST_CREDS_OK=1
 else
-    container_expires=$(jq -r '.claudeAiOauth.expiresAt // 0' "$TARGET_CREDS" 2>/dev/null || echo 0)
-    if [[ "$host_expires" -gt "$container_expires" ]]; then
-        log "host credentials newer (${host_expires} > ${container_expires}) — refreshing"
+    log "host credentials missing or malformed — skipping credential refresh"
+fi
+
+# --- (1) Credentials: kopieren wenn Host strikt neuer oder Container fehlt
+if [[ "$HOST_CREDS_OK" == "1" ]]; then
+    host_expires=$(jq -r '.claudeAiOauth.expiresAt // 0' "$HOST_CREDS")
+
+    if [[ ! -f "$TARGET_CREDS" ]]; then
+        log "no container credentials yet — installing from host"
         install_for_target "$HOST_CREDS" "$TARGET_CREDS" 600
+    else
+        container_expires=$(jq -r '.claudeAiOauth.expiresAt // 0' "$TARGET_CREDS" 2>/dev/null || echo 0)
+        if [[ "$host_expires" -gt "$container_expires" ]]; then
+            log "host credentials newer (${host_expires} > ${container_expires}) — refreshing"
+            install_for_target "$HOST_CREDS" "$TARGET_CREDS" 600
+        fi
     fi
 fi
 
 # --- (2) .claude.json: bei userID-Wechsel Account-Felder mergen -----------
 #       (nicht ersetzen — sonst gingen Trust-/RemoteControl-Felder verloren)
-if [[ -r "$HOST_JSON" ]]; then
+if [[ "$HOST_CREDS_OK" == "1" && -r "$HOST_JSON" ]]; then
     host_uid=$(jq -r '.userID // empty' "$HOST_JSON")
     container_uid=$(jq -r '.userID // empty' "$TARGET_JSON" 2>/dev/null || true)
 
     if [[ -n "$host_uid" && "$host_uid" != "$container_uid" ]]; then
         log "userID changed on host — merging account fields into .claude.json"
-        current="{}"
-        [[ -f "$TARGET_JSON" ]] && current="$(cat "$TARGET_JSON")"
+        current="$(read_json_or_empty "$TARGET_JSON")"
         merged="$(jq -n \
             --argjson cur "$current" \
             --slurpfile host "$HOST_JSON" \
@@ -74,8 +96,7 @@ REMOTE_CONTROL="${CLAUDE_REMOTE_CONTROL:-true}"
 
 [[ -z "$WORKSPACE" ]] && warn "no workspace path known (CLAUDE_WORKSPACE_PATH / PWD empty) — workspace-trust skipped"
 
-current="{}"
-[[ -f "$TARGET_JSON" ]] && current="$(cat "$TARGET_JSON")"
+current="$(read_json_or_empty "$TARGET_JSON")"
 
 # Inkrementeller Aufbau der Merge-Pipeline
 desired="$current"
@@ -108,8 +129,7 @@ DEFAULT_MODE="${CLAUDE_DEFAULT_MODE:-}"
 if [[ -z "$DEFAULT_MODE" ]]; then
     log "defaultMode option empty — settings.json not touched"
 else
-    cur_settings="{}"
-    [[ -f "$TARGET_SETTINGS" ]] && cur_settings="$(cat "$TARGET_SETTINGS")"
+    cur_settings="$(read_json_or_empty "$TARGET_SETTINGS")"
 
     new_settings="$(printf '%s' "$cur_settings" | jq --arg mode "$DEFAULT_MODE" '
         .permissions = ((.permissions // {}) | .defaultMode = $mode)
