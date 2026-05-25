@@ -110,4 +110,22 @@ install -m 0755 "$SRC_DIR/onCreate.sh"   "$FEATURE_DIR/onCreate.sh"
 install -m 0755 "$SRC_DIR/postCreate.sh" "$FEATURE_DIR/postCreate.sh"
 install -m 0755 "$SRC_DIR/postStart.sh"  "$FEATURE_DIR/postStart.sh"
 
+# --- (6) Persistiere Options als Runtime-Config --------------------------
+# Options sind nur waehrend install.sh als env vars verfuegbar; die
+# Lifecycle-Hooks (onCreate/postCreate/postStart) sehen sie nicht. Im
+# Feature-Manifest containerEnv wird ${templateOption:...} vom CLI NICHT
+# substituiert (das ist Template-Syntax). Wir persistieren die Werte
+# daher hier in einer Datei, die _lib.sh am Anfang sourcet.
+CONFIG_ENV="${FEATURE_DIR}/config.env"
+{
+    printf 'CLAUDE_TARGET_USER=%q\n'           "${TARGETUSER:-}"
+    printf 'CLAUDE_CHANNEL=%q\n'               "${CHANNEL:-stable}"
+    printf 'CLAUDE_DEFAULT_MODE=%q\n'          "${DEFAULTMODE:-auto}"
+    printf 'CLAUDE_REMOTE_CONTROL=%q\n'        "${REMOTECONTROL:-true}"
+    printf 'CLAUDE_REMOTE_CONTROL_SERVER=%q\n' "${REMOTECONTROLSERVER:-false}"
+    printf 'CLAUDE_MARKETPLACES=%q\n'          "${MARKETPLACES:-}"
+    printf 'CLAUDE_PLUGINS=%q\n'               "${PLUGINS:-}"
+} > "$CONFIG_ENV"
+chmod 0644 "$CONFIG_ENV"
+
 echo "==> claude-code ${version} cached + claude-code installed."

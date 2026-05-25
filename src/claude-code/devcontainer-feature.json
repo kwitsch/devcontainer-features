@@ -43,15 +43,8 @@
         }
     },
     "containerEnv": {
-        "CLAUDE_TARGET_USER":           "${templateOption:targetUser}",
-        "CLAUDE_CHANNEL":               "${templateOption:channel}",
-        "CLAUDE_DEFAULT_MODE":          "${templateOption:defaultMode}",
-        "CLAUDE_REMOTE_CONTROL":        "${templateOption:remoteControl}",
-        "CLAUDE_REMOTE_CONTROL_SERVER": "${templateOption:remoteControlServer}",
-        "CLAUDE_MARKETPLACES":          "${templateOption:marketplaces}",
-        "CLAUDE_PLUGINS":               "${templateOption:plugins}",
-        "HOST_CLAUDE_MOUNT":            "/host_claude",
-        "CLAUDE_WORKSPACE_PATH":        "${containerWorkspaceFolder}"
+        "HOST_CLAUDE_MOUNT":     "/host_claude",
+        "CLAUDE_WORKSPACE_PATH": "${containerWorkspaceFolder}"
     },
     "mounts": [
         {

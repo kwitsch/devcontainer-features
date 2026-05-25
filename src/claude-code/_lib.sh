@@ -14,6 +14,17 @@ log()  { printf '[%s] %s\n'        "${SCRIPT_TAG:-claude}" "$*"; }
 warn() { printf '[%s] WARN: %s\n'  "${SCRIPT_TAG:-claude}" "$*" >&2; }
 fail() { printf '[%s] ERROR: %s\n' "${SCRIPT_TAG:-claude}" "$*" >&2; exit 1; }
 
+# --- Runtime-Config laden -------------------------------------------------
+# Option-Werte sind im containerEnv des Feature-Manifests nicht
+# substituierbar (${templateOption:...} ist Template-Syntax, nicht
+# Feature-Syntax). install.sh schreibt die Werte daher in eine Datei,
+# die wir hier sourcen — vor jeder anderen Logik, damit CLAUDE_*-Vars
+# fuer alle nachfolgenden Funktionen verfuegbar sind.
+if [[ -f /usr/local/share/claude-code/config.env ]]; then
+    # shellcheck disable=SC1091
+    . /usr/local/share/claude-code/config.env
+fi
+
 # --- Target-User-Erkennung -------------------------------------------------
 # Erster non-root login-faehiger User aus /etc/passwd (lowest UID >= 1000,
 # < 65534, shell endet nicht auf nologin|false). Echoes username or empty.
