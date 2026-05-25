@@ -1,5 +1,4 @@
 {
-    "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainerFeature.schema.json",
     "id": "claude-code",
     "version": "0.1.0",
     "name": "Claude Code + Credentials Bridge",
@@ -55,8 +54,16 @@
         "CLAUDE_WORKSPACE_PATH":        "${containerWorkspaceFolder}"
     },
     "mounts": [
-        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude.json,target=/host_claude/.claude.json,type=bind,readonly",
-        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/host_claude/.claude,type=bind,readonly"
+        {
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.claude.json",
+            "target": "/host_claude/.claude.json",
+            "type": "bind"
+        },
+        {
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.claude",
+            "target": "/host_claude/.claude",
+            "type": "bind"
+        }
     ],
     "onCreateCommand":   "/usr/local/share/claude-code/onCreate.sh",
     "postCreateCommand": "/usr/local/share/claude-code/postCreate.sh",
