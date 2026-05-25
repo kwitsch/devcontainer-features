@@ -105,6 +105,10 @@ current="$(read_json_or_empty "$TARGET_JSON")"
 desired="$current"
 if [[ "$REMOTE_CONTROL" == "true" ]]; then
     desired="$(printf '%s' "$desired" | jq '.remoteControlAtStartup = true')"
+else
+    # Explizit entfernen — sonst bleibt auf persistent volumes nach einem
+    # frueheren remoteControl=true die Auto-Registrierung haengen.
+    desired="$(printf '%s' "$desired" | jq 'del(.remoteControlAtStartup)')"
 fi
 if [[ -n "$WORKSPACE" ]]; then
     desired="$(printf '%s' "$desired" | jq --arg ws "$WORKSPACE" '

@@ -29,8 +29,9 @@ check "binary cached at /opt/claude-code/cache/claude" \
 check "VERSION marker exists" \
     test -s /opt/claude-code/cache/VERSION
 
-check "lifecycle: _lib.sh present (mode 644)" \
-    test -f /usr/local/share/claude-code/_lib.sh
+check "lifecycle: _lib.sh present with mode 644" \
+    bash -c 'test -f /usr/local/share/claude-code/_lib.sh && \
+             [ "$(stat -c %a /usr/local/share/claude-code/_lib.sh)" = "644" ]'
 
 check "lifecycle: onCreate.sh executable" \
     test -x /usr/local/share/claude-code/onCreate.sh

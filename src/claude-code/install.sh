@@ -3,10 +3,10 @@
 #
 # Rolle: Image-Build-Zeit Pre-Warm-Cache fuer das Claude Code Binary.
 #   - Laedt das aktuelle Binary nach /opt/claude-code/cache/claude
-#   - Setzt KEINE PATH-Erweiterung (uebernimmt `claude install` in postCreate)
+#   - Setzt KEINE PATH-Erweiterung (uebernimmt `claude install` in onCreate)
 #   - Ruft `claude install` NICHT auf (das wuerde im Home von root landen)
 #
-# postCreate ruft anschliessend
+# onCreate.sh ruft anschliessend
 #       /opt/claude-code/cache/claude install <channel>
 # als Target-User auf — dieses Bootstrap-Binary kopiert sich nach
 # ~/.local/share/claude/versions/<v>/ und legt den Launcher unter

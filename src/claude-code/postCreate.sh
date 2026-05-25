@@ -44,16 +44,23 @@ if ! printf '%s' "$extracted_json" | \
 fi
 
 # --- Install ---------------------------------------------------------------
+# Harden TARGET_DIR einmalig — install_for_target laesst Parent-Dirs
+# bewusst unangetastet.
 mkdir -p "$TARGET_DIR"
-cp "$HOST_CREDS"                  "$TARGET_CREDS"
-printf '%s\n' "$extracted_json" > "$TARGET_JSON"
-
 chmod 700 "$TARGET_DIR"
-chmod 600 "$TARGET_CREDS" "$TARGET_JSON"
-
 if [[ "$(id -u)" -eq 0 ]]; then
-    chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR" "$TARGET_JSON"
+    chown "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
 fi
+
+# install_for_target schreibt nach mktemp im Zielverzeichnis und macht
+# einen atomaren rename. Damit folgen wir keinen Symlinks (das waere mit
+# plain `cp` / shell-redirect bei root-execution gefaehrlich).
+install_for_target "$HOST_CREDS" "$TARGET_CREDS" 600
+
+tmp_json="$(mktemp)"
+printf '%s\n' "$extracted_json" > "$tmp_json"
+install_for_target "$tmp_json" "$TARGET_JSON" 600
+rm -f "$tmp_json"
 
 log "credentials and config installed for ${TARGET_USER}"
 
