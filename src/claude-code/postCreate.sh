@@ -39,7 +39,8 @@ extracted_json="$(jq '{
 
 if ! printf '%s' "$extracted_json" | \
      jq -e '.userID and .oauthAccount' >/dev/null 2>&1; then
-    fail "could not extract userID / oauthAccount from ${HOST_JSON}"
+    warn "could not extract userID / oauthAccount from ${HOST_JSON} — skipping"
+    exit 0
 fi
 
 # --- Install ---------------------------------------------------------------
@@ -80,7 +81,7 @@ if [[ -n "$MARKETPLACES_CSV" ]] || [[ -n "$PLUGINS_CSV" ]]; then
         if [[ -n "$MARKETPLACES_CSV" ]]; then
             IFS=',' read -ra MARKETPLACES <<< "$MARKETPLACES_CSV"
             for mp in "${MARKETPLACES[@]}"; do
-                mp="${mp// /}"                       # Whitespace entfernen
+                mp="$(trim_ws "$mp")"
                 [[ -z "$mp" ]] && continue
                 log "adding marketplace: ${mp}"
                 if ! run_as_target "$CLAUDE_BIN" plugin marketplace add "$mp"; then
@@ -93,7 +94,7 @@ if [[ -n "$MARKETPLACES_CSV" ]] || [[ -n "$PLUGINS_CSV" ]]; then
         if [[ -n "$PLUGINS_CSV" ]]; then
             IFS=',' read -ra PLUGINS <<< "$PLUGINS_CSV"
             for plugin in "${PLUGINS[@]}"; do
-                plugin="${plugin// /}"
+                plugin="$(trim_ws "$plugin")"
                 [[ -z "$plugin" ]] && continue
                 log "installing plugin: ${plugin}"
                 if ! run_as_target "$CLAUDE_BIN" plugin install "$plugin"; then

@@ -50,13 +50,15 @@ fi
 
 # --- (1) Credentials: kopieren wenn Host strikt neuer oder Container fehlt
 if [[ "$HOST_CREDS_OK" == "1" ]]; then
-    host_expires=$(jq -r '.claudeAiOauth.expiresAt // 0' "$HOST_CREDS")
+    # `tonumber? // 0`: bei null/missing/string-Werten faellt auf 0 zurueck,
+    # statt mit ParseError unter set -e die ganze Hook abzubrechen.
+    host_expires=$(jq -r '(.claudeAiOauth.expiresAt | tonumber? // 0)' "$HOST_CREDS")
 
     if [[ ! -f "$TARGET_CREDS" ]]; then
         log "no container credentials yet — installing from host"
         install_for_target "$HOST_CREDS" "$TARGET_CREDS" 600
     else
-        container_expires=$(jq -r '.claudeAiOauth.expiresAt // 0' "$TARGET_CREDS" 2>/dev/null || echo 0)
+        container_expires=$(jq -r '(.claudeAiOauth.expiresAt | tonumber? // 0)' "$TARGET_CREDS" 2>/dev/null || echo 0)
         if [[ "$host_expires" -gt "$container_expires" ]]; then
             log "host credentials newer (${host_expires} > ${container_expires}) — refreshing"
             install_for_target "$HOST_CREDS" "$TARGET_CREDS" 600
@@ -66,7 +68,8 @@ fi
 
 # --- (2) .claude.json: bei userID-Wechsel Account-Felder mergen -----------
 #       (nicht ersetzen — sonst gingen Trust-/RemoteControl-Felder verloren)
-if [[ "$HOST_CREDS_OK" == "1" && -r "$HOST_JSON" ]]; then
+if [[ "$HOST_CREDS_OK" == "1" && -r "$HOST_JSON" ]] && \
+   jq -e . "$HOST_JSON" >/dev/null 2>&1; then
     host_uid=$(jq -r '.userID // empty' "$HOST_JSON")
     container_uid=$(jq -r '.userID // empty' "$TARGET_JSON" 2>/dev/null || true)
 

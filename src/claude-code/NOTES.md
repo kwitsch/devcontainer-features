@@ -56,7 +56,7 @@ For the bind mounts to resolve, the host user must have **logged into Claude Cod
 | Target user differs between image build and runtime | Auto-detect runs on every lifecycle hook; no hardcoded UID. |
 | Re-run on persistent volume | `claude install` skipped if `~/.local/bin/claude` already exists. Token refresh only writes when host `expiresAt` is strictly greater than container's. |
 | Host account switched (different `userID`) | `postStart` merges the new account fields into the existing `.claude.json` without losing workspace trust + remote-control settings. |
-| Concurrent reads during token refresh | All file writes use `mktemp` + atomic `mv` within the same filesystem. |
+| Concurrent reads during token refresh | `postStart.sh` writes (credential refresh, `.claude.json` patch, `settings.json` patch) go through a `mktemp` + atomic `mv` helper on the same filesystem. The initial install in `postCreate.sh` uses plain `cp` / shell redirects after the host mount has been validated. |
 
 ## Configuration option notes
 

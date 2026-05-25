@@ -10,6 +10,10 @@ source dev-container-features-test-lib
 TARGET_USER="$(awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /(nologin|false)$/ \
     { print $3":"$1 }' /etc/passwd | sort -n | head -n1 | cut -d: -f2)"
 
+# Without this gate, an empty TARGET_USER would call `getent passwd ""`,
+# which returns every entry and resolves TARGET_HOME to /root by accident.
+check "target user was discovered" test -n "$TARGET_USER"
+
 # The option value is persisted to the Feature's config.env (sourced by
 # every lifecycle hook). containerEnv cannot carry it directly because
 # ${templateOption:...} is template syntax and not substituted in features.

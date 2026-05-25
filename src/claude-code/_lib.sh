@@ -81,34 +81,35 @@ run_as_target() {
 }
 
 # --- Atomares Installieren einer Datei in TARGET_USER-Pfade ---------------
-# Schreibt nach mktemp im Zielverzeichnis, chmod/chown, dann atomares mv.
+# Schreibt nach mktemp im Zielverzeichnis, chmod/chown des Files, dann
+# atomares mv. Beruehrt das Parent-Verzeichnis bewusst NICHT: postCreate.sh
+# hardened ${TARGET_DIR} einmalig, und Pfade ausserhalb (z.B. ~/.claude.json
+# direkt unter $HOME) sollen nicht ueberraschend chmod 700 / chown bekommen.
 # Verwendung: install_for_target <src> <dst> <mode>  (mode z.B. 600)
-#
-# Hardening der Permissions am Zielverzeichnis (chmod 700, chown user) wird
-# NUR fuer Pfade unterhalb von ${TARGET_DIR} angewendet — sonst wuerde z.B.
-# bei dst=~/.claude.json (parent dir = ${TARGET_HOME}) das gesamte Home
-# auf 0700 gesetzt und auf TARGET_USER gechownt.
 install_for_target() {
     local src="$1" dst="$2" mode="$3"
     [[ -n "${TARGET_USER:-}" ]] || fail "install_for_target called before resolve_target_paths"
 
     local dir; dir="$(dirname "$dst")"
     mkdir -p "$dir"
-    if [[ "$dir" == "${TARGET_DIR}" || "$dir" == "${TARGET_DIR}"/* ]]; then
-        chmod 700 "$dir"
-    fi
 
     local tmp; tmp="$(mktemp -p "$dir" .stage.XXXXXX)"
     cp "$src" "$tmp"
     chmod "$mode" "$tmp"
     if [[ "$(id -u)" -eq 0 ]]; then
-        if [[ "$dir" == "${TARGET_DIR}" || "$dir" == "${TARGET_DIR}"/* ]]; then
-            chown "${TARGET_USER}:${TARGET_USER}" "$tmp" "$dir"
-        else
-            chown "${TARGET_USER}:${TARGET_USER}" "$tmp"
-        fi
+        chown "${TARGET_USER}:${TARGET_USER}" "$tmp"
     fi
     mv "$tmp" "$dst"      # atomar (gleiches Filesystem)
+}
+
+# Whitespace-Trim (leading + trailing) ohne externe Tools. Internal
+# Whitespace bleibt erhalten — wichtig fuer Pfade mit Leerzeichen in
+# Komma-Listen wie CLAUDE_MARKETPLACES / CLAUDE_PLUGINS.
+trim_ws() {
+    local s="$1"
+    s="${s#"${s%%[![:space:]]*}"}"
+    s="${s%"${s##*[![:space:]]}"}"
+    printf '%s' "$s"
 }
 
 # --- Hintergrund-Spawn als TARGET_USER ------------------------------------
