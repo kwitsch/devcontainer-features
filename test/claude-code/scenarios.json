@@ -1,0 +1,40 @@
+{
+    "bypass-permissions": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "defaultMode": "bypassPermissions"
+            }
+        }
+    },
+    "no-extras": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "defaultMode": "",
+                "remoteControl": false,
+                "remoteControlServer": false
+            }
+        }
+    },
+    "auto-detect-user": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "targetUser": ""
+            }
+        }
+    },
+    "with-marketplaces": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "marketplaces": "anthropics/claude-code"
+            }
+        }
+    }
+}

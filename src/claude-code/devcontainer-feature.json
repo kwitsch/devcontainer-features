@@ -1,0 +1,67 @@
+{
+    "id": "claude-code",
+    "version": "1.0.0",
+    "name": "Claude Code + Credentials Bridge",
+    "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart.",
+    "options": {
+        "targetUser": {
+            "type": "string",
+            "default": "",
+            "description": "Container user that should own the credentials and run `claude install`. Leave empty to auto-detect the first non-root login-capable user (lowest UID >= 1000 with a real shell)."
+        },
+        "channel": {
+            "type": "string",
+            "default": "stable",
+            "enum": ["stable", "latest"],
+            "description": "Claude Code release channel passed to `claude install <channel>`. Controls auto-updater behavior."
+        },
+        "defaultMode": {
+            "type": "string",
+            "default": "auto",
+            "enum": ["", "default", "acceptEdits", "plan", "dontAsk", "bypassPermissions", "auto"],
+            "description": "permissions.defaultMode written to ~/.claude/settings.json. Empty string = do not touch the setting. 'auto' may require a one-time per-account opt-in (Claude Code >= 2.1.83); 'bypassPermissions' suppresses all prompts unconditionally."
+        },
+        "remoteControl": {
+            "type": "boolean",
+            "default": true,
+            "description": "When true, sets remoteControlAtStartup=true in ~/.claude.json so every `claude` session auto-registers for Remote Control. When false, user must enable it manually per session via /remote-control or /config."
+        },
+        "remoteControlServer": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, postStart spawns `claude remote-control --spawn worktree` as a long-running background daemon under the target user. Requires the workspace to be a git repository. PID and log under ~/.claude/remote-control.{pid,log}. Independent of the `remoteControl` option above."
+        },
+        "marketplaces": {
+            "type": "string",
+            "default": "",
+            "description": "Comma-separated list of Claude Code plugin marketplaces to add after credential setup in postCreate. Each item is passed to `claude plugin marketplace add <item>`. Accepts GitHub shorthand (owner/repo), URLs, or local paths. Example: \"anthropics/claude-code,my-org/internal\""
+        },
+        "plugins": {
+            "type": "string",
+            "default": "",
+            "description": "Comma-separated list of plugins to install after marketplaces are added. Each item is passed to `claude plugin install <item>` in the format `<plugin>@<marketplace>`. Example: \"formatter@anthropics/claude-code,linter@my-org\""
+        }
+    },
+    "containerEnv": {
+        "HOST_CLAUDE_MOUNT":     "/host_claude",
+        "CLAUDE_WORKSPACE_PATH": "${containerWorkspaceFolder}"
+    },
+    "mounts": [
+        {
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.claude.json",
+            "target": "/host_claude/.claude.json",
+            "type": "bind"
+        },
+        {
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.claude",
+            "target": "/host_claude/.claude",
+            "type": "bind"
+        }
+    ],
+    "onCreateCommand":   "/usr/local/share/claude-code/onCreate.sh",
+    "postCreateCommand": "/usr/local/share/claude-code/postCreate.sh",
+    "postStartCommand":  "/usr/local/share/claude-code/postStart.sh",
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}
