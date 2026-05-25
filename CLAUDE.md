@@ -43,7 +43,7 @@ Unlike a typical "single shell command in /usr/local/bin" Feature, this one uses
 Two hooks are wired in `.claude/settings.json` so the generated Feature READMEs stay in sync without manual steps:
 
 - `block-feature-readme-edit.sh` (PreToolUse, matcher `Write|Edit|MultiEdit|NotebookEdit`): denies edits to any `src/<feature>/README.md`. Reason surfaced to the model: edit `devcontainer-feature.json` or `NOTES.md` instead.
-- `regenerate-feature-readme.sh` (PostToolUse, matcher `Write|Edit|MultiEdit`): after edits to `src/<feature>/devcontainer-feature.json` or `src/<feature>/NOTES.md`, runs `devcontainer features generate-docs --project-folder . --namespace <owner-from-git-remote>/<repo>`. Same generator the release workflow invokes via `devcontainers/action@v1`, so local output matches the release-PR output. Soft-skips when the `devcontainer` CLI or `git remote.origin.url` is missing.
+- `regenerate-feature-readme.sh` (PostToolUse, matcher `Write|Edit|MultiEdit`): after edits to `src/<feature>/devcontainer-feature.json` or `src/<feature>/NOTES.md`, runs `npx --yes -p @devcontainers/cli devcontainer features generate-docs --project-folder . --namespace <owner-from-git-remote>/<repo>`. Same generator the release workflow invokes via `devcontainers/action@v1`, so local output matches the release-PR output. Silent-skips when `npx` or `git remote.origin.url` is missing. SHA-256s the feature README before/after and, if it changed, emits an `additionalContext` message reminding Claude to review whether the **top-level `./README.md`** (option tables, examples) needs the same update.
 
 ### Test layout (`test/claude-code/`)
 

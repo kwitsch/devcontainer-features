@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # PostToolUse hook: after editing src/<feature>/devcontainer-feature.json
-# or src/<feature>/NOTES.md, regenerate the Feature READMEs with the
-# devcontainer CLI (same generator the release workflow uses via
-# devcontainers/action@v1).
+# or src/<feature>/NOTES.md, regenerate the Feature READMEs via
+# `npx @devcontainers/cli` (same generator the release workflow uses via
+# devcontainers/action@v1). Silent skip if npx is unavailable.
+# If the generated src/<feature>/README.md actually changed, emits an
+# additionalContext message so Claude reviews the top-level README too.
 set -euo pipefail
 
 input=$(cat)
@@ -24,29 +26,38 @@ feature_name="${BASH_REMATCH[2]}"
 cwd=$(printf '%s' "$input" | jq -r '.cwd // ""')
 [ -n "$cwd" ] && cd "$cwd"
 
-if [ ! -d "src/$feature_name" ]; then
-  echo "regenerate-feature-readme: src/$feature_name not found in $(pwd); skipping." >&2
-  exit 0
-fi
+[ -d "src/$feature_name" ] || exit 0
 
-if ! command -v devcontainer >/dev/null 2>&1; then
-  echo "regenerate-feature-readme: devcontainer CLI not found; install with 'npm install -g @devcontainers/cli'. Skipping regeneration for $feature_name." >&2
-  exit 0
-fi
+# Silent skip when npx is not available (no Node toolchain on this host).
+command -v npx >/dev/null 2>&1 || exit 0
 
 namespace=""
 if remote_url=$(git config --get remote.origin.url 2>/dev/null); then
   namespace=$(printf '%s' "$remote_url" | sed -E 's#^.*github\.com[:/]##; s#\.git$##')
 fi
-if [ -z "$namespace" ]; then
-  echo "regenerate-feature-readme: could not derive namespace from git remote.origin.url; skipping." >&2
-  exit 0
-fi
+[ -n "$namespace" ] || exit 0
 
-echo "regenerate-feature-readme: regenerating Feature docs for '$feature_name' (namespace: $namespace)" >&2
-if ! devcontainer features generate-docs --project-folder . --namespace "$namespace" >&2; then
+readme="src/$feature_name/README.md"
+hash_before=""
+[ -f "$readme" ] && hash_before=$(sha256sum "$readme" | awk '{print $1}')
+
+echo "regenerate-feature-readme: regenerating Feature docs for '$feature_name' (namespace: $namespace) via npx" >&2
+if ! npx --yes -p @devcontainers/cli devcontainer features generate-docs \
+      --project-folder . --namespace "$namespace" >&2; then
   echo "regenerate-feature-readme: 'devcontainer features generate-docs' failed." >&2
   exit 1
+fi
+
+hash_after=""
+[ -f "$readme" ] && hash_after=$(sha256sum "$readme" | awk '{print $1}')
+
+if [ "$hash_before" != "$hash_after" ]; then
+  jq -n --arg feat "$feature_name" --arg readme "$readme" '{
+    hookSpecificOutput: {
+      hookEventName: "PostToolUse",
+      additionalContext: ("Regenerated \($readme) from src/\($feat)/devcontainer-feature.json + NOTES.md. Review whether the top-level ./README.md (option tables, descriptions, usage snippets) also needs updating to stay in sync.")
+    }
+  }'
 fi
 
 exit 0
