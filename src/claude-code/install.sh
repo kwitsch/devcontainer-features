@@ -117,14 +117,17 @@ install -m 0755 "$SRC_DIR/postStart.sh"  "$FEATURE_DIR/postStart.sh"
 # substituiert (das ist Template-Syntax). Wir persistieren die Werte
 # daher hier in einer Datei, die _lib.sh am Anfang sourcet.
 CONFIG_ENV="${FEATURE_DIR}/config.env"
+# Use ${VAR-default} (not ${VAR:-default}) so that an *explicit empty*
+# user value — e.g. defaultMode="" — is preserved instead of being
+# silently replaced by the install-time fallback.
 {
-    printf 'CLAUDE_TARGET_USER=%q\n'           "${TARGETUSER:-}"
-    printf 'CLAUDE_CHANNEL=%q\n'               "${CHANNEL:-stable}"
-    printf 'CLAUDE_DEFAULT_MODE=%q\n'          "${DEFAULTMODE:-auto}"
-    printf 'CLAUDE_REMOTE_CONTROL=%q\n'        "${REMOTECONTROL:-true}"
-    printf 'CLAUDE_REMOTE_CONTROL_SERVER=%q\n' "${REMOTECONTROLSERVER:-false}"
-    printf 'CLAUDE_MARKETPLACES=%q\n'          "${MARKETPLACES:-}"
-    printf 'CLAUDE_PLUGINS=%q\n'               "${PLUGINS:-}"
+    printf 'CLAUDE_TARGET_USER=%q\n'           "${TARGETUSER-}"
+    printf 'CLAUDE_CHANNEL=%q\n'               "${CHANNEL-stable}"
+    printf 'CLAUDE_DEFAULT_MODE=%q\n'          "${DEFAULTMODE-auto}"
+    printf 'CLAUDE_REMOTE_CONTROL=%q\n'        "${REMOTECONTROL-true}"
+    printf 'CLAUDE_REMOTE_CONTROL_SERVER=%q\n' "${REMOTECONTROLSERVER-false}"
+    printf 'CLAUDE_MARKETPLACES=%q\n'          "${MARKETPLACES-}"
+    printf 'CLAUDE_PLUGINS=%q\n'               "${PLUGINS-}"
 } > "$CONFIG_ENV"
 chmod 0644 "$CONFIG_ENV"
 

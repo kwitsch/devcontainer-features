@@ -14,9 +14,8 @@ jobs:
         features:
           - claude-code
         baseImage:
-          - debian:latest
-          - ubuntu:latest
           - mcr.microsoft.com/devcontainers/base:ubuntu
+          - mcr.microsoft.com/devcontainers/base:debian
     steps:
       - uses: actions/checkout@v4
 
