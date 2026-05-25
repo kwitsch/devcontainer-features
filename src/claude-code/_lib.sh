@@ -91,7 +91,18 @@ install_for_target() {
     [[ -n "${TARGET_USER:-}" ]] || fail "install_for_target called before resolve_target_paths"
 
     local dir; dir="$(dirname "$dst")"
-    mkdir -p "$dir"
+    # Wenn ${TARGET_DIR} fehlt (z.B. postCreate hat wegen fehlender
+    # Host-Creds soft-skipped) und wir hier als root angekommen sind,
+    # muss das Verzeichnis dem Target-User gehoeren — sonst kann er es
+    # spaeter nicht beschreiben.
+    if [[ ! -d "$dir" ]]; then
+        mkdir -p "$dir"
+        if [[ "$(id -u)" -eq 0 ]] && \
+           [[ "$dir" == "${TARGET_DIR}" || "$dir" == "${TARGET_DIR}"/* ]]; then
+            chmod 700 "$dir"
+            chown "${TARGET_USER}:${TARGET_USER}" "$dir"
+        fi
+    fi
 
     local tmp; tmp="$(mktemp -p "$dir" .stage.XXXXXX)"
     cp "$src" "$tmp"

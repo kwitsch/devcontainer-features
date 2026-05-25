@@ -2,14 +2,16 @@
 # Default test — Feature mit Standard-Optionen installiert.
 # Wird vom `devcontainer features test` Autorun-Mechanismus aufgerufen.
 #
-# Was hier getestet werden KANN (ohne Host-Mount, ohne Login):
+# CI stubt $HOME/.claude.json + $HOME/.claude/.credentials.json mit
+# minimalen valid-JSON-Dummies (siehe .github/workflows/test.yaml), damit
+# postCreate/postStart ihren Happy-Path durchlaufen. Echte Marketplace-/
+# Plugin-Installs werden trotzdem nicht erreicht (kein Login).
+#
+# Verifiziert werden:
 #   - Build-Time-Artefakte: Cache-Binary, Lifecycle-Skripte, Tooling
 #   - onCreate-Output: `claude install` Launcher unter ~/.local/bin/claude
+#   - postCreate-Output: Credentials/.claude.json in Target-User-Home
 #   - postStart-Output: workspace trust + defaultMode in den Config-Files
-#
-# Was NICHT getestet wird (braucht Host-Bind-Mount):
-#   - Credential-Forwarding (postCreate's Hauptarbeit)
-#   - Plugin/Marketplace-Install (Soft-skip ohne Credentials)
 
 set -e
 
@@ -51,9 +53,9 @@ check "no /opt/claude-code/bin leftover in /etc/environment" \
 # Resolver-Logik aus _lib.sh inline: erster non-root, login-faehiger User
 TARGET_USER="$(awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /(nologin|false)$/ \
     { print $3":"$1 }' /etc/passwd | sort -n | head -n1 | cut -d: -f2)"
-TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
-
 check "target user resolved" test -n "$TARGET_USER"
+
+TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
 check "target user has home" test -d "$TARGET_HOME"
 
 check "claude launcher installed in target user home" \
