@@ -17,8 +17,8 @@ Pre-warms a Claude Code binary cache in /opt during image build, runs `claude in
 |-----|-----|-----|-----|
 | targetUser | Container user that should own the credentials and run `claude install`. Leave empty to auto-detect the first non-root login-capable user (lowest UID >= 1000 with a real shell). | string | - |
 | channel | Claude Code release channel passed to `claude install <channel>`. Controls auto-updater behavior. | string | stable |
-| defaultMode | permissions.defaultMode written to ~/.claude/settings.json. Empty string = do not touch the setting. 'auto' may require a one-time per-account opt-in (Claude Code >= 2.1.83); 'bypassPermissions' suppresses all prompts unconditionally. | string | auto |
-| remoteControl | When true, sets remoteControlAtStartup=true in ~/.claude.json so every `claude` session auto-registers for Remote Control. When false, user must enable it manually per session via /remote-control or /config. | boolean | true |
+| defaultMode | permissions.defaultMode written to ~/.claude/settings.json. Empty string = do not touch the setting. For 'auto' (Claude Code >= 2.1.83) the Feature also writes skipAutoPermissionPrompt=true to pre-accept the one-time opt-in dialog; for 'bypassPermissions' it writes skipDangerousModePermissionPrompt=true. | string | auto |
+| remoteControl | When true, sets remoteControlAtStartup=true in ~/.claude/settings.json (where Claude Code >= 2.1.83 reads it) and remoteDialogSeen=true in ~/.claude.json so every `claude` session auto-registers for Remote Control without prompting. When false, user must enable it manually per session via /remote-control or /config. | boolean | true |
 | remoteControlServer | When true, postStart spawns `claude remote-control --spawn worktree` as a long-running background daemon under the target user. Requires the workspace to be a git repository. PID and log under ~/.claude/remote-control.{pid,log}. Independent of the `remoteControl` option above. | boolean | false |
 | marketplaces | Comma-separated list of Claude Code plugin marketplaces to add after credential setup in postCreate. Each item is passed to `claude plugin marketplace add <item>`. Accepts GitHub shorthand (owner/repo), URLs, or local paths. Example: "anthropics/claude-code,my-org/internal" | string | - |
 | plugins | Comma-separated list of plugins to install after marketplaces are added. Each item is passed to `claude plugin install <item>` in the format `<plugin>@<marketplace>`. Example: "formatter@anthropics/claude-code,linter@my-org" | string | - |
@@ -42,7 +42,10 @@ Container lifecycle:
                ── marketplace add → plugin install (in that order)
 
     postStart  ── token refresh (if host has newer `expiresAt`)
-               ── workspace trust + remoteControlAtStartup + permissions.defaultMode
+               ── workspace trust + remoteDialogSeen in ~/.claude.json
+               ── permissions.defaultMode + remoteControlAtStartup +
+                  skipAutoPermissionPrompt / skipDangerousModePermissionPrompt
+                  in ~/.claude/settings.json
                ── optional: spawn `claude remote-control --spawn worktree` daemon
 ```
 
@@ -95,10 +98,10 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 
 ## Configuration option notes
 
-**`defaultMode = "auto"`** — Anthropic's ML-classifier permission mode. Requires Claude Code ≥ 2.1.83 and a Pro/Max/Team/Enterprise account. The **first** cycle into auto mode per account may show a one-time opt-in confirmation; there is no known JSON field to pre-accept this. Use `"bypassPermissions"` instead if you need zero prompts unconditionally.
+**`defaultMode = "auto"`** — Anthropic's ML-classifier permission mode. Requires Claude Code ≥ 2.1.83 and a Pro/Max/Team/Enterprise account. The first cycle into auto mode per account otherwise shows a one-time opt-in dialog; this Feature pre-accepts it by writing `skipAutoPermissionPrompt=true` alongside `permissions.defaultMode="auto"` into `~/.claude/settings.json`. For `defaultMode = "bypassPermissions"` the analogue `skipDangerousModePermissionPrompt=true` is written.
 
 **`remoteControl`** vs. **`remoteControlServer`** — these are independent:
-- `remoteControl=true` writes `remoteControlAtStartup=true` to `~/.claude.json` → every *interactive* `claude` session auto-registers for Remote Control.
+- `remoteControl=true` writes `remoteControlAtStartup=true` to `~/.claude/settings.json` (this is where Claude Code ≥ 2.1.83 actually reads it from — older docs that point at `~/.claude.json` are out of date) and sets `remoteDialogSeen=true` in `~/.claude.json` to suppress the one-time prompt. Result: every *interactive* `claude` session auto-registers for Remote Control.
 - `remoteControlServer=true` spawns a long-running `claude remote-control --spawn worktree` *daemon* in `postStart` even when no user is at the terminal. PID + log at `~/.claude/remote-control.{pid,log}`.
 
 **`marketplaces` / `plugins`** — comma-separated strings (devcontainer Feature options do not support native arrays). Items are trimmed of whitespace; empty items are skipped. Order is preserved. Both are only attempted if the credential setup did not soft-fail.

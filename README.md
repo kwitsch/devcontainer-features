@@ -27,8 +27,8 @@ Selected options (full list in [`src/claude-code/devcontainer-feature.json`](src
 |---|---|---|
 | `targetUser` | `""` (auto-detect) | Container user that should own credentials and run `claude install`. Empty = first non-root login-capable user (lowest UID ≥ 1000). |
 | `channel` | `stable` | `claude install <channel>` — `stable` or `latest`. |
-| `defaultMode` | `auto` | `permissions.defaultMode` in `~/.claude/settings.json`. `""` = leave untouched; `bypassPermissions` = suppress all prompts. |
-| `remoteControl` | `true` | Sets `remoteControlAtStartup=true` in `~/.claude.json` so every interactive `claude` session auto-registers for Remote Control. |
+| `defaultMode` | `auto` | `permissions.defaultMode` in `~/.claude/settings.json`. `""` = leave untouched; `auto` also writes `skipAutoPermissionPrompt=true` to pre-accept the one-time opt-in dialog; `bypassPermissions` also writes `skipDangerousModePermissionPrompt=true`. |
+| `remoteControl` | `true` | Sets `remoteControlAtStartup=true` in `~/.claude/settings.json` (where Claude Code ≥ 2.1.83 reads it) and `remoteDialogSeen=true` in `~/.claude.json` so every interactive `claude` session auto-registers for Remote Control without prompting. |
 | `remoteControlServer` | `false` | Spawns `claude remote-control --spawn worktree` as a long-running daemon (workspace must be a git repo). |
 | `marketplaces` | `""` | Comma-separated list passed to `claude plugin marketplace add <item>` (e.g. `anthropics/claude-code,my-org/internal`). |
 | `plugins` | `""` | Comma-separated `<plugin>@<marketplace>` items passed to `claude plugin install`. |
