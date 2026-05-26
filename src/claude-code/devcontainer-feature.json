@@ -1,6 +1,6 @@
 {
     "id": "claude-code",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "name": "Claude Code + Credentials Bridge",
     "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart.",
     "options": {
@@ -19,12 +19,12 @@
             "type": "string",
             "default": "auto",
             "enum": ["", "default", "acceptEdits", "plan", "dontAsk", "bypassPermissions", "auto"],
-            "description": "permissions.defaultMode written to ~/.claude/settings.json. Empty string = do not touch the setting. 'auto' may require a one-time per-account opt-in (Claude Code >= 2.1.83); 'bypassPermissions' suppresses all prompts unconditionally."
+            "description": "permissions.defaultMode written to ~/.claude/settings.json. Empty string = do not touch the setting. For 'auto' (Claude Code >= 2.1.83) the Feature also writes skipAutoPermissionPrompt=true to pre-accept the one-time opt-in dialog; for 'bypassPermissions' it writes skipDangerousModePermissionPrompt=true."
         },
         "remoteControl": {
             "type": "boolean",
             "default": true,
-            "description": "When true, sets remoteControlAtStartup=true in ~/.claude.json so every `claude` session auto-registers for Remote Control. When false, user must enable it manually per session via /remote-control or /config."
+            "description": "When true, sets remoteControlAtStartup=true in ~/.claude/settings.json (where Claude Code >= 2.1.83 reads it) and remoteDialogSeen=true in ~/.claude.json so every `claude` session auto-registers for Remote Control without prompting. When false, user must enable it manually per session via /remote-control or /config."
         },
         "remoteControlServer": {
             "type": "boolean",

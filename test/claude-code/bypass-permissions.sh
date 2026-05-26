@@ -18,4 +18,12 @@ check "permissions.defaultMode = 'bypassPermissions'" \
     bash -c "jq -e '.permissions.defaultMode == \"bypassPermissions\"' \
              '${TARGET_HOME}/.claude/settings.json'"
 
+check "skipDangerousModePermissionPrompt = true (pre-accept bypass opt-in)" \
+    bash -c "jq -e '.skipDangerousModePermissionPrompt == true' \
+             '${TARGET_HOME}/.claude/settings.json'"
+
+check "skipAutoPermissionPrompt NOT set (only auto-mode adds it)" \
+    bash -c "jq -e '(.skipAutoPermissionPrompt // null) != true' \
+             '${TARGET_HOME}/.claude/settings.json'"
+
 reportResults

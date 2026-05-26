@@ -17,7 +17,10 @@ Container lifecycle:
                ── marketplace add → plugin install (in that order)
 
     postStart  ── token refresh (if host has newer `expiresAt`)
-               ── workspace trust + remoteControlAtStartup + permissions.defaultMode
+               ── workspace trust + remoteDialogSeen in ~/.claude.json
+               ── permissions.defaultMode + remoteControlAtStartup +
+                  skipAutoPermissionPrompt / skipDangerousModePermissionPrompt
+                  in ~/.claude/settings.json
                ── optional: spawn `claude remote-control --spawn worktree` daemon
 ```
 
@@ -70,10 +73,10 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 
 ## Configuration option notes
 
-**`defaultMode = "auto"`** — Anthropic's ML-classifier permission mode. Requires Claude Code ≥ 2.1.83 and a Pro/Max/Team/Enterprise account. The **first** cycle into auto mode per account may show a one-time opt-in confirmation; there is no known JSON field to pre-accept this. Use `"bypassPermissions"` instead if you need zero prompts unconditionally.
+**`defaultMode = "auto"`** — Anthropic's ML-classifier permission mode. Requires Claude Code ≥ 2.1.83 and a Pro/Max/Team/Enterprise account. The first cycle into auto mode per account otherwise shows a one-time opt-in dialog; this Feature pre-accepts it by writing `skipAutoPermissionPrompt=true` alongside `permissions.defaultMode="auto"` into `~/.claude/settings.json`. For `defaultMode = "bypassPermissions"` the analogue `skipDangerousModePermissionPrompt=true` is written.
 
 **`remoteControl`** vs. **`remoteControlServer`** — these are independent:
-- `remoteControl=true` writes `remoteControlAtStartup=true` to `~/.claude.json` → every *interactive* `claude` session auto-registers for Remote Control.
+- `remoteControl=true` writes `remoteControlAtStartup=true` to `~/.claude/settings.json` (this is where Claude Code ≥ 2.1.83 actually reads it from — older docs that point at `~/.claude.json` are out of date) and sets `remoteDialogSeen=true` in `~/.claude.json` to suppress the one-time prompt. Result: every *interactive* `claude` session auto-registers for Remote Control.
 - `remoteControlServer=true` spawns a long-running `claude remote-control --spawn worktree` *daemon* in `postStart` even when no user is at the terminal. PID + log at `~/.claude/remote-control.{pid,log}`.
 
 **`marketplaces` / `plugins`** — comma-separated strings (devcontainer Feature options do not support native arrays). Items are trimmed of whitespace; empty items are skipped. Order is preserved. Both are only attempted if the credential setup did not soft-fail.

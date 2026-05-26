@@ -5,10 +5,13 @@
 #   (1) Credentials refreshen, wenn der Host neuere Tokens hat
 #       (Kriterium: claudeAiOauth.expiresAt strikt groesser).
 #   (2) Bei Account-Wechsel auf dem Host (anderer userID) Account-Felder
-#       in die existierende .claude.json mergen — Trust-/Remote-Control-
-#       Felder bleiben dabei erhalten.
-#   (3) Workspace-Trust + remoteControlAtStartup in .claude.json sichern.
-#   (4) permissions.defaultMode = "auto" in settings.json sichern.
+#       in die existierende .claude.json mergen — Trust-/Dialog-Felder
+#       bleiben dabei erhalten.
+#   (3) Workspace-Trust (per-Projekt) + remoteDialogSeen in .claude.json.
+#   (4) settings.json: permissions.defaultMode, remoteControlAtStartup
+#       und die zugehoerigen skip*-Opt-in-Flags. Wichtig: remoteControl
+#       UND auto-mode-Opt-out leben in settings.json, NICHT in .claude.json
+#       (Stand Claude Code >= 2.1.83).
 
 set -euo pipefail
 
@@ -91,25 +94,27 @@ if [[ "$HOST_CREDS_OK" == "1" && -r "$HOST_JSON" ]] && \
     fi
 fi
 
-# --- (3) Workspace-Trust + Remote-Control: idempotent in .claude.json -----
-#       Workspace-Trust:  immer (wenn Workspace-Pfad bekannt)
-#       remoteControlAtStartup:  nur wenn Feature-Option `remoteControl=true`
+# --- (3) Workspace-Trust + remoteDialogSeen in .claude.json ---------------
+#       Workspace-Trust (per Projekt):  immer (wenn Workspace-Pfad bekannt)
+#       remoteDialogSeen (top-level):   nur wenn remoteControl=true
+#                                       (sonst erscheint der einmalige
+#                                       Remote-Control-Hinweisdialog).
 WORKSPACE="${CLAUDE_WORKSPACE_PATH:-${PWD:-}}"
 REMOTE_CONTROL="${CLAUDE_REMOTE_CONTROL:-true}"
 
 [[ -z "$WORKSPACE" ]] && warn "no workspace path known (CLAUDE_WORKSPACE_PATH / PWD empty) — workspace-trust skipped"
 
 current="$(read_json_or_empty "$TARGET_JSON")"
-
-# Inkrementeller Aufbau der Merge-Pipeline
 desired="$current"
+
 if [[ "$REMOTE_CONTROL" == "true" ]]; then
-    desired="$(printf '%s' "$desired" | jq '.remoteControlAtStartup = true')"
-else
-    # Explizit entfernen — sonst bleibt auf persistent volumes nach einem
-    # frueheren remoteControl=true die Auto-Registrierung haengen.
-    desired="$(printf '%s' "$desired" | jq 'del(.remoteControlAtStartup)')"
+    desired="$(printf '%s' "$desired" | jq '.remoteDialogSeen = true')"
 fi
+# Migrationspfad: aeltere Feature-Versionen haben remoteControlAtStartup
+# faelschlich hierher geschrieben — entfernen, sonst bleibt der tote Key
+# in der Datei und stiftet Verwirrung. Der echte Wert sitzt in settings.json.
+desired="$(printf '%s' "$desired" | jq 'del(.remoteControlAtStartup)')"
+
 if [[ -n "$WORKSPACE" ]]; then
     desired="$(printf '%s' "$desired" | jq --arg ws "$WORKSPACE" '
         .projects = ((.projects // {}) | .[$ws] = ((.[$ws] // {})
@@ -129,27 +134,48 @@ if [[ "$(printf '%s' "$current"  | jq -S .)" != \
     rm -f "$tmp_file"
 fi
 
-# --- (4) permissions.defaultMode in ~/.claude/settings.json ---------------
-#       Nur setzen wenn CLAUDE_DEFAULT_MODE nicht leer ist.
+# --- (4) settings.json: defaultMode + remoteControlAtStartup + skip flags
+#       Realer logged-in Zustand zeigt: alle drei Keys leben hier, NICHT
+#       in .claude.json. Die skip*-Flags unterdruecken die einmaligen
+#       Opt-in-Dialoge fuer auto/bypassPermissions.
 DEFAULT_MODE="${CLAUDE_DEFAULT_MODE:-}"
 
-if [[ -z "$DEFAULT_MODE" ]]; then
-    log "defaultMode option empty — settings.json not touched"
-else
-    cur_settings="$(read_json_or_empty "$TARGET_SETTINGS")"
+cur_settings="$(read_json_or_empty "$TARGET_SETTINGS")"
+new_settings="$cur_settings"
 
-    new_settings="$(printf '%s' "$cur_settings" | jq --arg mode "$DEFAULT_MODE" '
+# defaultMode: nur anfassen wenn Option nicht leer
+if [[ -n "$DEFAULT_MODE" ]]; then
+    new_settings="$(printf '%s' "$new_settings" | jq --arg mode "$DEFAULT_MODE" '
         .permissions = ((.permissions // {}) | .defaultMode = $mode)
     ')"
 
-    if [[ "$(printf '%s' "$cur_settings" | jq -S .)" != \
-          "$(printf '%s' "$new_settings" | jq -S .)" ]]; then
-        log "setting permissions.defaultMode = \"${DEFAULT_MODE}\" in ${TARGET_SETTINGS}"
-        tmp_file="$(mktemp)"
-        printf '%s\n' "$new_settings" > "$tmp_file"
-        install_for_target "$tmp_file" "$TARGET_SETTINGS" 600
-        rm -f "$tmp_file"
-    fi
+    # Pre-accept des Opt-in-Dialogs fuer den jeweiligen Modus.
+    case "$DEFAULT_MODE" in
+        auto)
+            new_settings="$(printf '%s' "$new_settings" | jq '.skipAutoPermissionPrompt = true')"
+            ;;
+        bypassPermissions)
+            new_settings="$(printf '%s' "$new_settings" | jq '.skipDangerousModePermissionPrompt = true')"
+            ;;
+    esac
+fi
+
+# remoteControlAtStartup: idempotent setzen oder entfernen
+if [[ "$REMOTE_CONTROL" == "true" ]]; then
+    new_settings="$(printf '%s' "$new_settings" | jq '.remoteControlAtStartup = true')"
+else
+    # Explizit entfernen — sonst bleibt auf persistent volumes nach einem
+    # frueheren remoteControl=true die Auto-Registrierung haengen.
+    new_settings="$(printf '%s' "$new_settings" | jq 'del(.remoteControlAtStartup)')"
+fi
+
+if [[ "$(printf '%s' "$cur_settings" | jq -S .)" != \
+      "$(printf '%s' "$new_settings" | jq -S .)" ]]; then
+    log "patching ${TARGET_SETTINGS} (defaultMode=${DEFAULT_MODE:-<unchanged>}, remoteControl=${REMOTE_CONTROL})"
+    tmp_file="$(mktemp)"
+    printf '%s\n' "$new_settings" > "$tmp_file"
+    install_for_target "$tmp_file" "$TARGET_SETTINGS" 600
+    rm -f "$tmp_file"
 fi
 
 # --- (5) Optional: claude remote-control --spawn worktree als Daemon -----

@@ -68,16 +68,22 @@ check "claude launcher installed in target user home" \
 check "claude launcher executes via direct path" \
     "${TARGET_HOME}/.local/bin/claude" --version
 
-# --- postStart-Resultat: .claude.json patches -----------------------------
+# --- postStart-Resultat: .claude.json + settings.json patches -------------
 # Default-Optionen: remoteControl=true, defaultMode=auto
 check "workspace trust applied to .claude.json" \
     bash -c "jq -e '.projects | to_entries | length > 0' '${TARGET_HOME}/.claude.json'"
 
-check "remoteControlAtStartup = true in .claude.json (default)" \
-    bash -c "jq -e '.remoteControlAtStartup == true' '${TARGET_HOME}/.claude.json'"
+check "remoteDialogSeen = true in .claude.json (default)" \
+    bash -c "jq -e '.remoteDialogSeen == true' '${TARGET_HOME}/.claude.json'"
+
+check "remoteControlAtStartup = true in settings.json (default)" \
+    bash -c "jq -e '.remoteControlAtStartup == true' '${TARGET_HOME}/.claude/settings.json'"
 
 check "permissions.defaultMode = 'auto' in settings.json (default)" \
     bash -c "jq -e '.permissions.defaultMode == \"auto\"' '${TARGET_HOME}/.claude/settings.json'"
+
+check "skipAutoPermissionPrompt = true in settings.json (default with auto mode)" \
+    bash -c "jq -e '.skipAutoPermissionPrompt == true' '${TARGET_HOME}/.claude/settings.json'"
 
 # Report result
 reportResults
