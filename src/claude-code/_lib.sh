@@ -156,6 +156,70 @@ resolve_workspace_folder() {
     fi
 }
 
+# --- Workspace-Trust auf alle /workspaces/* anwenden ----------------------
+# Schreibt .projects[<subdir>] = { hasTrustDialogAccepted: true,
+# hasCompletedProjectOnboarding: true } in TARGET_JSON fuer jeden
+# unmittelbaren Unterordner von /workspaces. Idempotent.
+#
+# Wird sowohl aus postCreate.sh als auch postStart.sh aufgerufen — beim
+# Create steht .claude.json u.U. noch nicht (z.B. weil Host-Creds fehlen
+# und postCreate frueh exitet); deshalb startet das Skript notfalls von
+# einem leeren JSON-Objekt und legt die Datei selbst an.
+#
+# Voraussetzung: resolve_target_paths wurde vorher aufgerufen
+# (TARGET_JSON / TARGET_USER muessen gesetzt sein).
+apply_workspace_trust() {
+    if ! command -v jq >/dev/null 2>&1; then
+        warn "jq not available — workspace-trust skipped"
+        return 0
+    fi
+    if [[ -z "${TARGET_JSON:-}" ]]; then
+        warn "TARGET_JSON not set — call resolve_target_paths first"
+        return 0
+    fi
+    if [[ ! -d /workspaces ]]; then
+        log "no /workspaces directory — workspace-trust skipped"
+        return 0
+    fi
+
+    local trust_paths=() d
+    for d in /workspaces/*/; do
+        if [[ -d "$d" ]]; then trust_paths+=("${d%/}"); fi
+    done
+
+    if [[ ${#trust_paths[@]} -eq 0 ]]; then
+        log "no /workspaces/*/ subdirs found — workspace-trust skipped"
+        return 0
+    fi
+
+    local current desired
+    if [[ -f "$TARGET_JSON" ]] && jq -e . "$TARGET_JSON" >/dev/null 2>&1; then
+        current="$(cat "$TARGET_JSON")"
+    else
+        current='{}'
+    fi
+    desired="$current"
+
+    local p
+    for p in "${trust_paths[@]}"; do
+        desired="$(printf '%s' "$desired" | jq --arg ws "$p" '
+            .projects = ((.projects // {}) | .[$ws] = ((.[$ws] // {})
+                | .hasTrustDialogAccepted        = true
+                | .hasCompletedProjectOnboarding = true
+            ))
+        ')"
+    done
+
+    if [[ "$(printf '%s' "$current" | jq -S .)" != \
+          "$(printf '%s' "$desired" | jq -S .)" ]]; then
+        log "applying workspace-trust for: ${trust_paths[*]}"
+        local tmp; tmp="$(mktemp)"
+        printf '%s\n' "$desired" > "$tmp"
+        install_for_target "$tmp" "$TARGET_JSON" 600
+        rm -f "$tmp"
+    fi
+}
+
 # --- Release-Channel ermitteln --------------------------------------------
 # Praezedenz:
 #   (1) Feature-Option CLAUDE_CHANNEL (wenn non-empty) — Override

@@ -152,55 +152,18 @@ if [[ "$(printf '%s' "$current"        | jq -S .)" != \
     rm -f "$tmp_file"
 fi
 
-# --- (3) Workspace-Trust + remoteDialogSeen in .claude.json ---------------
-#       Workspace-Trust (per Projekt):  fuer den aufgeloesten Workspace,
-#                                       seinen realpath UND /workspaces
-#                                       inkl. allen unmittelbaren Subdirs.
-#                                       Claude prueft Trust per exact-path
-#                                       gegen .projects[<cwd>] — abweichende
-#                                       Pfade (Symlink, anderes Repo im
-#                                       selben /workspaces) wuerden sonst
-#                                       erneut den Dialog zeigen. Felder die
-#                                       das Binary tatsaechlich liest:
-#                                       hasTrustDialogAccepted +
-#                                       hasCompletedProjectOnboarding.
-#       remoteDialogSeen (top-level):   nur wenn remoteControl=true
-#                                       (sonst erscheint der einmalige
-#                                       Remote-Control-Hinweisdialog).
-WORKSPACE="$(resolve_workspace_folder)"
+# --- (3a) Workspace-Trust (idempotent re-apply — auch postCreate.sh setzt
+#          das schon beim Container-Create, hier nochmal fuer den Fall dass
+#          der Workspace zwischen den Starts geaendert wurde).
+apply_workspace_trust
+
+# --- (3b) remoteDialogSeen + remoteControlAtStartup-Migration in .claude.json
+#         remoteDialogSeen:  Top-level Flag — nur wenn remoteControl=true
+#                            (sonst erscheint der einmalige Remote-Control-
+#                            Hinweisdialog).
 REMOTE_CONTROL="${CLAUDE_REMOTE_CONTROL:-true}"
-
-# Liste der zu trustenden Pfade aufbauen (Dedup ueber lineare Suche —
-# bewusst indexed array statt `declare -A`, weil indirekte Expansion
-# `${!arr[*]:-<none>}` von Associative Arrays in einigen bash-Versionen
-# zu "invalid variable name" fuehrt).
-trust_paths=()
-add_trust_path() {
-    # Unter `set -e` muss diese Funktion immer mit 0 zurueckkehren — eine
-    # nicht-zutreffende Guard-Bedingung ist kein Fehler.
-    local p="$1"
-    if [[ -z "$p" || "$p" == "/" ]]; then return 0; fi
-    if [[ "$p" != /* ]];             then return 0; fi
-    if [[ ! -d "$p" ]];              then return 0; fi
-    local existing
-    for existing in ${trust_paths[@]+"${trust_paths[@]}"}; do
-        if [[ "$existing" == "$p" ]]; then return 0; fi
-    done
-    trust_paths+=("$p")
-    return 0
-}
-
-add_trust_path "$WORKSPACE"
-if [[ -n "$WORKSPACE" ]] && command -v realpath >/dev/null 2>&1; then
-    real_ws="$(realpath -m "$WORKSPACE" 2>/dev/null || true)"
-    add_trust_path "$real_ws"
-fi
-if [[ -d /workspaces ]]; then
-    add_trust_path "/workspaces"
-    for d in /workspaces/*/; do
-        if [[ -d "$d" ]]; then add_trust_path "${d%/}"; fi
-    done
-fi
+# Workspace-Pfad wird unten in Section (5) (remoteControlServer) gebraucht.
+WORKSPACE="$(resolve_workspace_folder)"
 
 current="$(read_json_or_empty "$TARGET_JSON")"
 desired="$current"
@@ -213,26 +176,9 @@ fi
 # in der Datei und stiftet Verwirrung. Der echte Wert sitzt in settings.json.
 desired="$(printf '%s' "$desired" | jq 'del(.remoteControlAtStartup)')"
 
-if [[ ${#trust_paths[@]} -eq 0 ]]; then
-    warn "no trustable paths found (PWD invalid, /workspaces missing) — workspace-trust skipped"
-else
-    for p in "${trust_paths[@]}"; do
-        desired="$(printf '%s' "$desired" | jq --arg ws "$p" '
-            .projects = ((.projects // {}) | .[$ws] = ((.[$ws] // {})
-                | .hasTrustDialogAccepted        = true
-                | .hasCompletedProjectOnboarding = true
-            ))
-        ')"
-    done
-fi
-
-trust_summary="<none>"
-if [[ ${#trust_paths[@]} -gt 0 ]]; then
-    trust_summary="${trust_paths[*]}"
-fi
 if [[ "$(printf '%s' "$current"  | jq -S .)" != \
       "$(printf '%s' "$desired"  | jq -S .)" ]]; then
-    log "patching .claude.json (remoteControl=${REMOTE_CONTROL}, trusted paths: ${trust_summary})"
+    log "patching .claude.json (remoteControl=${REMOTE_CONTROL})"
     tmp_file="$(mktemp)"
     printf '%s\n' "$desired" > "$tmp_file"
     install_for_target "$tmp_file" "$TARGET_JSON" 600

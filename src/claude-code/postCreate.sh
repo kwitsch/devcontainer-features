@@ -20,6 +20,11 @@ command -v jq >/dev/null 2>&1 || fail "jq is required but not installed"
 
 resolve_target_paths
 
+# --- Workspace-Trust (unabhaengig von Host-Creds) -------------------------
+# Vor dem Soft-Exit-Pfad, damit der Trust-Dialog auch ohne Host-Creds
+# unterdrueckt wird (Claude haengt sonst beim ersten Aufruf am Trust-Prompt).
+apply_workspace_trust
+
 # --- Validate host mount ---------------------------------------------------
 [[ -r "$HOST_CREDS" ]] || { log "no host credentials at ${HOST_CREDS} — skipping"; exit 0; }
 [[ -r "$HOST_JSON"  ]] || { log "no ${HOST_JSON} — skipping";                       exit 0; }
