@@ -173,11 +173,14 @@ REMOTE_CONTROL="${CLAUDE_REMOTE_CONTROL:-true}"
 # Liste der zu trustenden Pfade aufbauen (Dedup ueber assoziatives Array).
 declare -A trust_set=()
 add_trust_path() {
+    # Unter `set -e` muss diese Funktion immer mit 0 zurueckkehren — eine
+    # nicht-zutreffende Guard-Bedingung ist kein Fehler.
     local p="$1"
-    [[ -z "$p" || "$p" == "/" ]] && return
-    [[ "$p" == /* ]] || return
-    [[ -d "$p" ]] || return
+    if [[ -z "$p" || "$p" == "/" ]]; then return 0; fi
+    if [[ "$p" != /* ]];             then return 0; fi
+    if [[ ! -d "$p" ]];              then return 0; fi
     trust_set["$p"]=1
+    return 0
 }
 
 add_trust_path "$WORKSPACE"
