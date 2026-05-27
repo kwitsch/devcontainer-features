@@ -1,8 +1,8 @@
 {
     "id": "claude-code",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "name": "Claude Code + Credentials Bridge",
-    "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container.",
+    "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container. Wizard-related Feature options (theme, defaultMode) default to empty so the host's completed wizard state wins; set them explicitly to override.",
     "options": {
         "targetUser": {
             "type": "string",
@@ -11,15 +11,15 @@
         },
         "channel": {
             "type": "string",
-            "default": "stable",
-            "enum": ["stable", "latest"],
-            "description": "Claude Code release channel passed to `claude install <channel>`. Controls auto-updater behavior."
+            "default": "",
+            "enum": ["", "stable", "latest"],
+            "description": "Claude Code release channel passed to `claude install <channel>`. Empty (default) reads the host's choice from `~/.claude/settings.json` (field `autoUpdatesChannel`, set by `claude install` on the host); falls back to `latest` if the host setting is absent or the bind mount is unavailable (e.g. Codespaces prebuild). Set explicitly to override."
         },
         "defaultMode": {
             "type": "string",
-            "default": "auto",
+            "default": "",
             "enum": ["", "default", "acceptEdits", "plan", "dontAsk", "bypassPermissions", "auto"],
-            "description": "permissions.defaultMode written to ~/.claude/settings.json. Empty string = do not touch the setting. For 'auto' (Claude Code >= 2.1.83) the Feature also writes skipAutoPermissionPrompt=true to pre-accept the one-time opt-in dialog; for 'bypassPermissions' it writes skipDangerousModePermissionPrompt=true."
+            "description": "permissions.defaultMode written to ~/.claude/settings.json. Empty string (default) = do not touch the setting; the value the host wizard wrote — if any — survives. Set explicitly to override. For 'auto' (Claude Code >= 2.1.83) the Feature also writes skipAutoPermissionPrompt=true to pre-accept the one-time opt-in dialog; for 'bypassPermissions' it writes skipDangerousModePermissionPrompt=true."
         },
         "remoteControl": {
             "type": "boolean",
@@ -48,14 +48,13 @@
         },
         "theme": {
             "type": "string",
-            "default": "dark",
+            "default": "",
             "enum": ["", "dark", "light", "dark-daltonized", "light-daltonized", "dark-ansi", "light-ansi"],
-            "description": "Theme written to ~/.claude.json (suppresses the first-run theme picker). Empty string = do not touch the setting; rely on forwardHostOnboarding to source it from the host instead. Default 'dark' guarantees the wizard is skipped even when the host has no .claude.json yet (e.g. logged in via a different mechanism)."
+            "description": "Theme written to ~/.claude.json. Empty string (default) lets the host's wizard choice through unchanged; set explicitly to force a theme regardless of host. If neither the host nor this option supplies a theme, postStart falls back to 'dark' as a final safety net so the picker never appears."
         }
     },
     "containerEnv": {
-        "HOST_CLAUDE_MOUNT":     "/host_claude",
-        "CLAUDE_WORKSPACE_PATH": "${containerWorkspaceFolder}"
+        "HOST_CLAUDE_MOUNT": "/host_claude"
     },
     "mounts": [
         {

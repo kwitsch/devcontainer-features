@@ -122,14 +122,14 @@ CONFIG_ENV="${FEATURE_DIR}/config.env"
 # silently replaced by the install-time fallback.
 {
     printf 'CLAUDE_TARGET_USER=%q\n'           "${TARGETUSER-}"
-    printf 'CLAUDE_CHANNEL=%q\n'               "${CHANNEL-stable}"
-    printf 'CLAUDE_DEFAULT_MODE=%q\n'          "${DEFAULTMODE-auto}"
+    printf 'CLAUDE_CHANNEL=%q\n'               "${CHANNEL-}"
+    printf 'CLAUDE_DEFAULT_MODE=%q\n'          "${DEFAULTMODE-}"
     printf 'CLAUDE_REMOTE_CONTROL=%q\n'        "${REMOTECONTROL-true}"
     printf 'CLAUDE_REMOTE_CONTROL_SERVER=%q\n' "${REMOTECONTROLSERVER-false}"
     printf 'CLAUDE_MARKETPLACES=%q\n'          "${MARKETPLACES-}"
     printf 'CLAUDE_PLUGINS=%q\n'               "${PLUGINS-}"
     printf 'CLAUDE_FORWARD_HOST_ONBOARDING=%q\n' "${FORWARDHOSTONBOARDING-true}"
-    printf 'CLAUDE_THEME=%q\n'                 "${THEME-dark}"
+    printf 'CLAUDE_THEME=%q\n'                 "${THEME-}"
 } > "$CONFIG_ENV"
 chmod 0644 "$CONFIG_ENV"
 

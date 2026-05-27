@@ -157,10 +157,10 @@ fi
 #       remoteDialogSeen (top-level):   nur wenn remoteControl=true
 #                                       (sonst erscheint der einmalige
 #                                       Remote-Control-Hinweisdialog).
-WORKSPACE="${CLAUDE_WORKSPACE_PATH:-${PWD:-}}"
+WORKSPACE="$(resolve_workspace_folder)"
 REMOTE_CONTROL="${CLAUDE_REMOTE_CONTROL:-true}"
 
-[[ -z "$WORKSPACE" ]] && warn "no workspace path known (CLAUDE_WORKSPACE_PATH / PWD empty) — workspace-trust skipped"
+[[ -z "$WORKSPACE" ]] && warn "no workspace path resolvable (PWD invalid, /workspaces ambiguous) — workspace-trust skipped"
 
 current="$(read_json_or_empty "$TARGET_JSON")"
 desired="$current"

@@ -113,6 +113,79 @@ install_for_target() {
     mv "$tmp" "$dst"      # atomar (gleiches Filesystem)
 }
 
+# --- Workspace-Folder ermitteln -------------------------------------------
+# Lifecycle-Skripte laufen per Devcontainer-Spec mit cwd = workspaceFolder,
+# also ist $PWD die primaere Quelle. `containerEnv.${containerWorkspaceFolder}`
+# wird vom Feature-Manifest aus NICHT substituiert (Docker emittiert
+# UndefinedVar und setzt die ENV auf leer/literal), daher hier kein Lookup
+# auf eine Feature-eigene ENV-Variable.
+#
+# Sanity-Checks:
+#   - absoluter Pfad, der existiert
+#   - kein literales "${...}" (Substitution-Reste)
+#   - nicht /
+#
+# Echoes den aufgeloesten Pfad oder leer, wenn nichts Vernuenftiges gefunden
+# wurde.
+resolve_workspace_folder() {
+    local cand
+    for cand in "${1:-}" "${PWD:-}"; do
+        [[ -z "$cand" ]] && continue
+        [[ "$cand" == \$* || "$cand" == \${* ]] && continue
+        [[ "$cand" == /* ]] || continue
+        [[ "$cand" == "/" ]] && continue
+        [[ -d "$cand" ]] || continue
+        printf '%s' "$cand"
+        return 0
+    done
+
+    # Letzter Ausweg: /workspaces/<single-dir> — Standard-Mountpunkt
+    # in VS Code / Codespaces Dev Containers.
+    if [[ -d /workspaces ]]; then
+        local found="" entry
+        for entry in /workspaces/*/; do
+            [[ -d "$entry" ]] || continue
+            if [[ -n "$found" ]]; then
+                # mehrere Kandidaten — nicht raten
+                printf ''
+                return 0
+            fi
+            found="${entry%/}"
+        done
+        [[ -n "$found" ]] && printf '%s' "$found"
+    fi
+}
+
+# --- Release-Channel ermitteln --------------------------------------------
+# Praezedenz:
+#   (1) Feature-Option CLAUDE_CHANNEL (wenn non-empty) — Override
+#   (2) Host-Settings `~/.claude/settings.json` Feld `autoUpdatesChannel`
+#       (Claude Code persistiert hier die Wahl von `claude install <channel>`;
+#        Binary-Strings: "Saved autoUpdatesChannel= ... to user settings")
+#   (3) Fallback "latest" — gilt fuer Codespaces-Prebuilds (kein Host-Mount)
+#       oder Hosts, die den Wert nicht gesetzt haben.
+#
+# Akzeptierte Werte: "stable" | "latest". Andere Werte werden verworfen und
+# fallen auf den naechsten Schritt durch.
+resolve_release_channel() {
+    local override="${CLAUDE_CHANNEL:-}"
+    case "$override" in
+        stable|latest) printf '%s' "$override"; return ;;
+    esac
+
+    local host_settings="${HOST_CLAUDE_MOUNT:-/host_claude}/.claude/settings.json"
+    if command -v jq >/dev/null 2>&1 && [[ -r "$host_settings" ]] && \
+       jq -e . "$host_settings" >/dev/null 2>&1; then
+        local val
+        val="$(jq -r '.autoUpdatesChannel // empty' "$host_settings" 2>/dev/null || true)"
+        case "$val" in
+            stable|latest) printf '%s' "$val"; return ;;
+        esac
+    fi
+
+    printf 'latest'
+}
+
 # Whitespace-Trim (leading + trailing) ohne externe Tools. Internal
 # Whitespace bleibt erhalten — wichtig fuer Pfade mit Leerzeichen in
 # Komma-Listen wie CLAUDE_MARKETPLACES / CLAUDE_PLUGINS.

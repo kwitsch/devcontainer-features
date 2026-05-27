@@ -1,7 +1,7 @@
 
 # Claude Code + Credentials Bridge (claude-code)
 
-Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container.
+Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container. Wizard-related Feature options (theme, defaultMode) default to empty so the host's completed wizard state wins; set them explicitly to override.
 
 ## Example Usage
 
@@ -16,14 +16,14 @@ Pre-warms a Claude Code binary cache in /opt during image build, runs `claude in
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
 | targetUser | Container user that should own the credentials and run `claude install`. Leave empty to auto-detect the first non-root login-capable user (lowest UID >= 1000 with a real shell). | string | - |
-| channel | Claude Code release channel passed to `claude install <channel>`. Controls auto-updater behavior. | string | stable |
-| defaultMode | permissions.defaultMode written to ~/.claude/settings.json. Empty string = do not touch the setting. For 'auto' (Claude Code >= 2.1.83) the Feature also writes skipAutoPermissionPrompt=true to pre-accept the one-time opt-in dialog; for 'bypassPermissions' it writes skipDangerousModePermissionPrompt=true. | string | auto |
+| channel | Claude Code release channel passed to `claude install <channel>`. Empty (default) reads the host's choice from `~/.claude/settings.json` (field `autoUpdatesChannel`, set by `claude install` on the host); falls back to `latest` if the host setting is absent or the bind mount is unavailable (e.g. Codespaces prebuild). Set explicitly to override. | string | - |
+| defaultMode | permissions.defaultMode written to ~/.claude/settings.json. Empty string (default) = do not touch the setting; the value the host wizard wrote — if any — survives. Set explicitly to override. For 'auto' (Claude Code >= 2.1.83) the Feature also writes skipAutoPermissionPrompt=true to pre-accept the one-time opt-in dialog; for 'bypassPermissions' it writes skipDangerousModePermissionPrompt=true. | string | - |
 | remoteControl | When true, sets remoteControlAtStartup=true in ~/.claude/settings.json (where Claude Code >= 2.1.83 reads it) and remoteDialogSeen=true in ~/.claude.json so every `claude` session auto-registers for Remote Control without prompting. When false, user must enable it manually per session via /remote-control or /config. | boolean | true |
 | remoteControlServer | When true, postStart spawns `claude remote-control --spawn worktree` as a long-running background daemon under the target user. Requires the workspace to be a git repository. PID and log under ~/.claude/remote-control.{pid,log}. Independent of the `remoteControl` option above. | boolean | false |
 | marketplaces | Comma-separated list of Claude Code plugin marketplaces to add after credential setup in postCreate. Each item is passed to `claude plugin marketplace add <item>`. Accepts GitHub shorthand (owner/repo), URLs, or local paths. Example: "anthropics/claude-code,my-org/internal" | string | - |
 | plugins | Comma-separated list of plugins to install after marketplaces are added. Each item is passed to `claude plugin install <item>` in the format `<plugin>@<marketplace>`. Example: "formatter@anthropics/claude-code,linter@my-org" | string | - |
 | forwardHostOnboarding | When true (default), postCreate/postStart copy the host's first-run wizard state (theme, tipsHistory, firstStartTime, editorMode, autoUpdates, verbose, previewFeaturesOptInList, subscriptionNoticeCount, bypassPermissionsModeAccepted, hasAvailableSubscription) into the container's ~/.claude.json. Without this the first `claude` invocation re-runs the theme picker / onboarding even though credentials are already present. | boolean | true |
-| theme | Theme written to ~/.claude.json (suppresses the first-run theme picker). Empty string = do not touch the setting; rely on forwardHostOnboarding to source it from the host instead. Default 'dark' guarantees the wizard is skipped even when the host has no .claude.json yet (e.g. logged in via a different mechanism). | string | dark |
+| theme | Theme written to ~/.claude.json. Empty string (default) lets the host's wizard choice through unchanged; set explicitly to force a theme regardless of host. If neither the host nor this option supplies a theme, postStart falls back to 'dark' as a final safety net so the picker never appears. | string | - |
 
 > **⚠️ macOS hosts are not supported.** Claude Code on macOS stores OAuth tokens in the system Keychain, not in a file under `~/.claude/`. This Feature reads credentials via a read-only bind mount of `~/.claude/.credentials.json` — which simply does not exist on a macOS host. Use a Linux host, a Windows host with Claude Code installed natively, or WSL2 (with Claude Code installed inside the WSL distribution).
 
@@ -104,7 +104,9 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 
 ## Configuration option notes
 
-**`defaultMode = "auto"`** — Anthropic's ML-classifier permission mode. Requires Claude Code ≥ 2.1.83 and a Pro/Max/Team/Enterprise account. The first cycle into auto mode per account otherwise shows a one-time opt-in dialog; this Feature pre-accepts it by writing `skipAutoPermissionPrompt=true` alongside `permissions.defaultMode="auto"` into `~/.claude/settings.json`. For `defaultMode = "bypassPermissions"` the analogue `skipDangerousModePermissionPrompt=true` is written.
+**`channel`** — defaults to empty so the host's chosen update channel wins. `claude install <channel>` on the host persists `autoUpdatesChannel: "stable"|"latest"` to `~/.claude/settings.json`; `onCreate.sh` reads that field via the bind mount (`/host_claude/.claude/settings.json`) and passes it to `claude install <channel>` inside the container. Fallback is `latest` when (a) the host setting is absent, (b) jq is unavailable, or (c) the bind mount is missing (typically Codespaces prebuilds). Setting the option explicitly always wins.
+
+**`defaultMode`** — defaults to empty so the value the host wizard wrote (if any) survives into the container. Set explicitly to override. Notable values: `"auto"` is Anthropic's ML-classifier permission mode (requires Claude Code ≥ 2.1.83 and a Pro/Max/Team/Enterprise account; the first cycle into auto mode per account otherwise shows a one-time opt-in dialog — this Feature pre-accepts it by writing `skipAutoPermissionPrompt=true` alongside `permissions.defaultMode="auto"` into `~/.claude/settings.json`). For `defaultMode = "bypassPermissions"` the analogue `skipDangerousModePermissionPrompt=true` is written.
 
 **`remoteControl`** vs. **`remoteControlServer`** — these are independent:
 - `remoteControl=true` writes `remoteControlAtStartup=true` to `~/.claude/settings.json` (this is where Claude Code ≥ 2.1.83 actually reads it from — older docs that point at `~/.claude.json` are out of date) and sets `remoteDialogSeen=true` in `~/.claude.json` to suppress the one-time prompt. Result: every *interactive* `claude` session auto-registers for Remote Control.
@@ -112,7 +114,7 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 
 **`marketplaces` / `plugins`** — comma-separated strings (devcontainer Feature options do not support native arrays). Items are trimmed of whitespace; empty items are skipped. Order is preserved. Both are only attempted if the credential setup did not soft-fail.
 
-**`forwardHostOnboarding` / `theme`** — suppress the first-run wizard inside the container. A valid login on the host is *not* enough on its own: Claude Code shows the theme picker (and other onboarding dialogs) whenever fields like `theme`, `firstStartTime`, or `tipsHistory` are absent from `~/.claude.json`. With `forwardHostOnboarding=true` (default), `postCreate.sh` copies those wizard-state fields from the host into the container, and `postStart.sh` idempotently nachzieht missing ones on every start (also fixes containers created by older Feature versions that did not write them). `theme` is an option-level override: any non-empty value (default `"dark"`) wins over the host's choice, which is useful for matching the IDE's color scheme regardless of what was picked on the host. As a final safety net, if `theme` would still be empty after all merges, `postStart.sh` forces it to `"dark"` so the picker is guaranteed not to appear.
+**`forwardHostOnboarding` / `theme`** — suppress the first-run wizard inside the container. A valid login on the host is *not* enough on its own: Claude Code shows the theme picker (and other onboarding dialogs) whenever fields like `theme`, `firstStartTime`, or `tipsHistory` are absent from `~/.claude.json`. With `forwardHostOnboarding=true` (default), `postCreate.sh` copies those wizard-state fields from the host into the container, and `postStart.sh` idempotently nachzieht missing ones on every start (also fixes containers created by older Feature versions that did not write them). `theme` defaults to empty so the host's wizard choice is preserved; set it explicitly to override (useful for matching the IDE's color scheme regardless of what was picked on the host). As a final safety net, if `theme` would still be empty after all merges — host has no `.claude.json`, option not set — `postStart.sh` forces it to `"dark"` so the picker is guaranteed not to appear.
 
 ## Known upstream issues
 
@@ -133,4 +135,4 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 
 ---
 
-_Note: This file was auto-generated from the [devcontainer-feature.json](https://github.com/kwitsch/devcontainer-features/blob/main/src/claude-code/devcontainer-feature.json).  Add additional notes to a `NOTES.md`._
+_Note: This file was auto-generated from the [devcontainer-feature.json](devcontainer-feature.json).  Add additional notes to a `NOTES.md`._

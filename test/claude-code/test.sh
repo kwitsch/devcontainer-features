@@ -69,9 +69,17 @@ check "claude launcher executes via direct path" \
     "${TARGET_HOME}/.local/bin/claude" --version
 
 # --- postStart-Resultat: .claude.json + settings.json patches -------------
-# Default-Optionen: remoteControl=true, defaultMode=auto
+# Default-Optionen (v1.3+): channel=latest, remoteControl=true,
+#   defaultMode="" (host wins; stub host has none → key absent),
+#   theme=""      (host wins; stub host has none → safety net → "dark").
 check "workspace trust applied to .claude.json" \
     bash -c "jq -e '.projects | to_entries | length > 0' '${TARGET_HOME}/.claude.json'"
+
+# Regression guard: ensure the workspace key is an actual absolute path
+# (existed once as literal '$containerWorkspaceFolder' when the obsolete
+# containerEnv substitution was still in the manifest).
+check "workspace trust key is an absolute path (no \$ substitution leftover)" \
+    bash -c 'jq -e ".projects | keys | map(startswith(\"/\") and (contains(\"\$\") | not)) | all" "'"${TARGET_HOME}"'/.claude.json"'
 
 check "remoteDialogSeen = true in .claude.json (default)" \
     bash -c "jq -e '.remoteDialogSeen == true' '${TARGET_HOME}/.claude.json'"
@@ -79,21 +87,65 @@ check "remoteDialogSeen = true in .claude.json (default)" \
 check "remoteControlAtStartup = true in settings.json (default)" \
     bash -c "jq -e '.remoteControlAtStartup == true' '${TARGET_HOME}/.claude/settings.json'"
 
-check "permissions.defaultMode = 'auto' in settings.json (default)" \
-    bash -c "jq -e '.permissions.defaultMode == \"auto\"' '${TARGET_HOME}/.claude/settings.json'"
+# defaultMode="" → Feature darf permissions.defaultMode nicht setzen.
+# `claude install` koennte settings.json mit eigenen defaults anlegen, deshalb
+# wird auf "key absent or not equal to a Feature-only value" geprueft.
+check "settings.json has no permissions.defaultMode when option is empty (default)" \
+    bash -c "
+        if [ -f '${TARGET_HOME}/.claude/settings.json' ]; then
+            jq -e '(.permissions.defaultMode // null) == null' '${TARGET_HOME}/.claude/settings.json'
+        fi
+    "
 
-check "skipAutoPermissionPrompt = true in settings.json (default with auto mode)" \
-    bash -c "jq -e '.skipAutoPermissionPrompt == true' '${TARGET_HOME}/.claude/settings.json'"
+check "settings.json has no skipAutoPermissionPrompt when defaultMode is empty (default)" \
+    bash -c "
+        if [ -f '${TARGET_HOME}/.claude/settings.json' ]; then
+            jq -e '(.skipAutoPermissionPrompt // null) != true' '${TARGET_HOME}/.claude/settings.json'
+        fi
+    "
 
 # --- Wizard-Suppression: erstes `claude` darf keinen Wizard zeigen --------
 check "hasCompletedOnboarding = true in .claude.json (default)" \
     bash -c "jq -e '.hasCompletedOnboarding == true' '${TARGET_HOME}/.claude.json'"
 
-check "theme = 'dark' in .claude.json (default option)" \
+# Host-Stub hat kein theme → safety net in postStart forciert "dark".
+check "theme = 'dark' in .claude.json (safety net, host stub has no theme)" \
     bash -c "jq -e '.theme == \"dark\"' '${TARGET_HOME}/.claude.json'"
 
 check "firstStartTime set in .claude.json" \
     bash -c "jq -e '(.firstStartTime // 0) > 0' '${TARGET_HOME}/.claude.json'"
+
+# --- resolve_release_channel: smoke tests ---------------------------------
+# Sourced after `claude install` ran, so config.env reflects the persisted
+# Feature options. We swap HOST_CLAUDE_MOUNT to point at temp fixtures.
+check "resolve_release_channel falls back to 'latest' without host setting" \
+    bash -c '
+        d="$(mktemp -d)"
+        mkdir -p "$d/.claude" && printf "{}" > "$d/.claude/settings.json"
+        . /usr/local/share/claude-code/_lib.sh
+        export HOST_CLAUDE_MOUNT="$d" CLAUDE_CHANNEL=""
+        [ "$(resolve_release_channel)" = "latest" ]
+    '
+
+check "resolve_release_channel picks 'stable' from host autoUpdatesChannel" \
+    bash -c '
+        d="$(mktemp -d)"
+        mkdir -p "$d/.claude"
+        printf "{\"autoUpdatesChannel\": \"stable\"}" > "$d/.claude/settings.json"
+        . /usr/local/share/claude-code/_lib.sh
+        export HOST_CLAUDE_MOUNT="$d" CLAUDE_CHANNEL=""
+        [ "$(resolve_release_channel)" = "stable" ]
+    '
+
+check "resolve_release_channel: CLAUDE_CHANNEL override beats host setting" \
+    bash -c '
+        d="$(mktemp -d)"
+        mkdir -p "$d/.claude"
+        printf "{\"autoUpdatesChannel\": \"stable\"}" > "$d/.claude/settings.json"
+        . /usr/local/share/claude-code/_lib.sh
+        export HOST_CLAUDE_MOUNT="$d" CLAUDE_CHANNEL="latest"
+        [ "$(resolve_release_channel)" = "latest" ]
+    '
 
 # Report result
 reportResults
