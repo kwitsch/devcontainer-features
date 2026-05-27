@@ -1,6 +1,7 @@
 #!/bin/bash
 # Scenario: defaultMode = "bypassPermissions"
-# Verifies that the chosen mode is written to settings.json instead of the default "auto".
+# Verifies that an explicitly set mode is written to settings.json (host wizard
+# state would otherwise win since the default is now empty).
 
 set -e
 source dev-container-features-test-lib

@@ -13,7 +13,7 @@ A Claude Code installer plus host-credentials bridge for dev containers. The Fea
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "features": {
         "ghcr.io/kwitsch/devcontainer-features/claude-code:0": {
-            "channel": "stable",
+            "channel": "latest",
             "defaultMode": "auto",
             "remoteControl": true
         }
@@ -26,14 +26,14 @@ Selected options (full list in [`src/claude-code/devcontainer-feature.json`](src
 | Option | Default | Description |
 |---|---|---|
 | `targetUser` | `""` (auto-detect) | Container user that should own credentials and run `claude install`. Empty = first non-root login-capable user (lowest UID ≥ 1000). |
-| `channel` | `stable` | `claude install <channel>` — `stable` or `latest`. |
-| `defaultMode` | `auto` | `permissions.defaultMode` in `~/.claude/settings.json`. `""` = leave untouched; `auto` also writes `skipAutoPermissionPrompt=true` to pre-accept the one-time opt-in dialog; `bypassPermissions` also writes `skipDangerousModePermissionPrompt=true`. |
+| `channel` | `latest` | `claude install <channel>` — `stable` or `latest`. |
+| `defaultMode` | `""` (host wins) | `permissions.defaultMode` in `~/.claude/settings.json`. Empty (default) leaves whatever the host wizard wrote untouched; set explicitly to override. `auto` also writes `skipAutoPermissionPrompt=true` to pre-accept the one-time opt-in dialog; `bypassPermissions` also writes `skipDangerousModePermissionPrompt=true`. |
 | `remoteControl` | `true` | Sets `remoteControlAtStartup=true` in `~/.claude/settings.json` (where Claude Code ≥ 2.1.83 reads it) and `remoteDialogSeen=true` in `~/.claude.json` so every interactive `claude` session auto-registers for Remote Control without prompting. |
 | `remoteControlServer` | `false` | Spawns `claude remote-control --spawn worktree` as a long-running daemon (workspace must be a git repo). |
 | `marketplaces` | `""` | Comma-separated list passed to `claude plugin marketplace add <item>` (e.g. `anthropics/claude-code,my-org/internal`). |
 | `plugins` | `""` | Comma-separated `<plugin>@<marketplace>` items passed to `claude plugin install`. |
 | `forwardHostOnboarding` | `true` | Carry the host's first-run wizard state (`theme`, `tipsHistory`, `firstStartTime`, `editorMode`, …) into the container so `claude` skips the theme picker / onboarding on first invocation. |
-| `theme` | `dark` | Theme written to `~/.claude.json`. Non-empty values override what `forwardHostOnboarding` copied from the host (`""` = leave untouched). Final safety net forces `"dark"` if no value is set anywhere, so the picker is guaranteed not to appear. |
+| `theme` | `""` (host wins) | Theme written to `~/.claude.json`. Empty (default) preserves whatever `forwardHostOnboarding` copied from the host; set explicitly to force a theme. Final safety net forces `"dark"` if no value is set anywhere (host has no `.claude.json`, option not set), so the picker is guaranteed not to appear. |
 
 > **Host requirement:** the Feature reads host OAuth tokens via bind mounts of `$HOME/.claude.json` and `$HOME/.claude/` (the lifecycle scripts only read from them — the Feature manifest cannot declare them `readonly` at the OS level, see [`NOTES.md`](src/claude-code/NOTES.md)). **macOS hosts are not supported** (Claude Code stores tokens in the Keychain, not on disk). On **Windows hosts**, open the project via VS Code's Remote-WSL extension (Claude Code lives inside the WSL distro, not under `%USERPROFILE%`) — see [`NOTES.md`](src/claude-code/NOTES.md#windows-hosts-use-remote-wsl). See [`NOTES.md`](src/claude-code/NOTES.md) for full platform compatibility and edge-case behavior.
 
