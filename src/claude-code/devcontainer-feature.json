@@ -1,8 +1,8 @@
 {
     "id": "claude-code",
-    "version": "1.1.1",
+    "version": "1.2.0",
     "name": "Claude Code + Credentials Bridge",
-    "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart.",
+    "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container.",
     "options": {
         "targetUser": {
             "type": "string",
@@ -40,6 +40,17 @@
             "type": "string",
             "default": "",
             "description": "Comma-separated list of plugins to install after marketplaces are added. Each item is passed to `claude plugin install <item>` in the format `<plugin>@<marketplace>`. Example: \"formatter@anthropics/claude-code,linter@my-org\""
+        },
+        "forwardHostOnboarding": {
+            "type": "boolean",
+            "default": true,
+            "description": "When true (default), postCreate/postStart copy the host's first-run wizard state (theme, tipsHistory, firstStartTime, editorMode, autoUpdates, verbose, previewFeaturesOptInList, subscriptionNoticeCount, bypassPermissionsModeAccepted, hasAvailableSubscription) into the container's ~/.claude.json. Without this the first `claude` invocation re-runs the theme picker / onboarding even though credentials are already present."
+        },
+        "theme": {
+            "type": "string",
+            "default": "dark",
+            "enum": ["", "dark", "light", "dark-daltonized", "light-daltonized", "dark-ansi", "light-ansi"],
+            "description": "Theme written to ~/.claude.json (suppresses the first-run theme picker). Empty string = do not touch the setting; rely on forwardHostOnboarding to source it from the host instead. Default 'dark' guarantees the wizard is skipped even when the host has no .claude.json yet (e.g. logged in via a different mechanism)."
         }
     },
     "containerEnv": {

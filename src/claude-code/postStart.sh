@@ -71,6 +71,9 @@ fi
 
 # --- (2) .claude.json: bei userID-Wechsel Account-Felder mergen -----------
 #       (nicht ersetzen — sonst gingen Trust-/RemoteControl-Felder verloren)
+FORWARD_HOST_ONBOARDING="${CLAUDE_FORWARD_HOST_ONBOARDING:-true}"
+THEME_OPT="${CLAUDE_THEME:-}"
+
 if [[ "$HOST_CREDS_OK" == "1" && -r "$HOST_JSON" ]] && \
    jq -e . "$HOST_JSON" >/dev/null 2>&1; then
     host_uid=$(jq -r '.userID // empty' "$HOST_JSON")
@@ -92,6 +95,61 @@ if [[ "$HOST_CREDS_OK" == "1" && -r "$HOST_JSON" ]] && \
         install_for_target "$tmp_file" "$TARGET_JSON" 600
         rm -f "$tmp_file"
     fi
+fi
+
+# --- (2b) Wizard-state idempotent nachziehen ------------------------------
+#       Schliesst zwei Luecken:
+#         - aeltere Feature-Versionen haben kein theme/firstStartTime
+#           geschrieben (re-run auf persistent volume).
+#         - Host wurde nach Container-Create neu eingeloggt (postCreate
+#           war bereits durch, hat aber nur Account-Felder uebernommen).
+#       Bestehende Werte werden NICHT ueberschrieben (ausser Theme-Option).
+current="$(read_json_or_empty "$TARGET_JSON")"
+desired_wizard="$current"
+
+if [[ "$FORWARD_HOST_ONBOARDING" == "true" && -r "$HOST_JSON" ]] && \
+   jq -e . "$HOST_JSON" >/dev/null 2>&1; then
+    desired_wizard="$(printf '%s' "$desired_wizard" | jq \
+        --slurpfile host "$HOST_JSON" \
+        '($host[0] | {
+            theme,
+            firstStartTime,
+            tipsHistory,
+            editorMode,
+            autoUpdates,
+            verbose,
+            previewFeaturesOptInList,
+            subscriptionNoticeCount,
+            bypassPermissionsModeAccepted,
+            hasAvailableSubscription
+        } | with_entries(select(.value != null))) as $h
+         | $h * .')"
+fi
+
+# Theme-Option wirkt als Override (gewinnt sowohl ueber Host als auch
+# ueber bestehenden Wert) — sonst bliebe ein vom Host uebernommener Wert
+# trotz explizitem Option-Wert.
+if [[ -n "$THEME_OPT" ]]; then
+    desired_wizard="$(printf '%s' "$desired_wizard" | \
+        jq --arg t "$THEME_OPT" '.theme = $t')"
+fi
+
+# Sicherheitsnetz: wenn theme nach all dem immer noch leer ist (z.B. weder
+# Host noch Option setzen es), default auf "dark" — dann kommt der Picker
+# garantiert nicht.
+desired_wizard="$(printf '%s' "$desired_wizard" | jq '
+    if (.theme // "") == "" then .theme = "dark" else . end
+  | if .hasCompletedOnboarding != true then .hasCompletedOnboarding = true else . end
+  | if .firstStartTime == null then .firstStartTime = (now * 1000 | floor) else . end
+')"
+
+if [[ "$(printf '%s' "$current"        | jq -S .)" != \
+      "$(printf '%s' "$desired_wizard" | jq -S .)" ]]; then
+    log "patching .claude.json wizard fields"
+    tmp_file="$(mktemp)"
+    printf '%s\n' "$desired_wizard" > "$tmp_file"
+    install_for_target "$tmp_file" "$TARGET_JSON" 600
+    rm -f "$tmp_file"
 fi
 
 # --- (3) Workspace-Trust + remoteDialogSeen in .claude.json ---------------

@@ -14,10 +14,14 @@ Container lifecycle:
                ── (prebuild-cacheable: result is baked into the prebuild image)
 
     postCreate ── credentials + minimal .claude.json from host bind mount
+               ── wizard-state fields (theme, firstStartTime, tipsHistory, …)
+                  carried forward so first `claude` invocation skips onboarding
                ── marketplace add → plugin install (in that order)
 
     postStart  ── token refresh (if host has newer `expiresAt`)
                ── workspace trust + remoteDialogSeen in ~/.claude.json
+               ── idempotent wizard-state nachziehen (handles host re-login
+                  or older Feature versions that did not write theme)
                ── permissions.defaultMode + remoteControlAtStartup +
                   skipAutoPermissionPrompt / skipDangerousModePermissionPrompt
                   in ~/.claude/settings.json
@@ -80,6 +84,8 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 - `remoteControlServer=true` spawns a long-running `claude remote-control --spawn worktree` *daemon* in `postStart` even when no user is at the terminal. PID + log at `~/.claude/remote-control.{pid,log}`.
 
 **`marketplaces` / `plugins`** — comma-separated strings (devcontainer Feature options do not support native arrays). Items are trimmed of whitespace; empty items are skipped. Order is preserved. Both are only attempted if the credential setup did not soft-fail.
+
+**`forwardHostOnboarding` / `theme`** — suppress the first-run wizard inside the container. A valid login on the host is *not* enough on its own: Claude Code shows the theme picker (and other onboarding dialogs) whenever fields like `theme`, `firstStartTime`, or `tipsHistory` are absent from `~/.claude.json`. With `forwardHostOnboarding=true` (default), `postCreate.sh` copies those wizard-state fields from the host into the container, and `postStart.sh` idempotently nachzieht missing ones on every start (also fixes containers created by older Feature versions that did not write them). `theme` is an option-level override: any non-empty value (default `"dark"`) wins over the host's choice, which is useful for matching the IDE's color scheme regardless of what was picked on the host. As a final safety net, if `theme` would still be empty after all merges, `postStart.sh` forces it to `"dark"` so the picker is guaranteed not to appear.
 
 ## Known upstream issues
 

@@ -32,6 +32,8 @@ Selected options (full list in [`src/claude-code/devcontainer-feature.json`](src
 | `remoteControlServer` | `false` | Spawns `claude remote-control --spawn worktree` as a long-running daemon (workspace must be a git repo). |
 | `marketplaces` | `""` | Comma-separated list passed to `claude plugin marketplace add <item>` (e.g. `anthropics/claude-code,my-org/internal`). |
 | `plugins` | `""` | Comma-separated `<plugin>@<marketplace>` items passed to `claude plugin install`. |
+| `forwardHostOnboarding` | `true` | Carry the host's first-run wizard state (`theme`, `tipsHistory`, `firstStartTime`, `editorMode`, …) into the container so `claude` skips the theme picker / onboarding on first invocation. |
+| `theme` | `dark` | Theme written to `~/.claude.json`. Non-empty values override what `forwardHostOnboarding` copied from the host (`""` = leave untouched). Final safety net forces `"dark"` if no value is set anywhere, so the picker is guaranteed not to appear. |
 
 > **Host requirement:** the Feature reads host OAuth tokens via bind mounts of `$HOME/.claude.json` and `$HOME/.claude/` (the lifecycle scripts only read from them — the Feature manifest cannot declare them `readonly` at the OS level, see [`NOTES.md`](src/claude-code/NOTES.md)). **macOS hosts are not supported** (Claude Code stores tokens in the Keychain, not on disk). On **Windows hosts**, open the project via VS Code's Remote-WSL extension (Claude Code lives inside the WSL distro, not under `%USERPROFILE%`) — see [`NOTES.md`](src/claude-code/NOTES.md#windows-hosts-use-remote-wsl). See [`NOTES.md`](src/claude-code/NOTES.md) for full platform compatibility and edge-case behavior.
 

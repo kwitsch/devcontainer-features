@@ -85,5 +85,15 @@ check "permissions.defaultMode = 'auto' in settings.json (default)" \
 check "skipAutoPermissionPrompt = true in settings.json (default with auto mode)" \
     bash -c "jq -e '.skipAutoPermissionPrompt == true' '${TARGET_HOME}/.claude/settings.json'"
 
+# --- Wizard-Suppression: erstes `claude` darf keinen Wizard zeigen --------
+check "hasCompletedOnboarding = true in .claude.json (default)" \
+    bash -c "jq -e '.hasCompletedOnboarding == true' '${TARGET_HOME}/.claude.json'"
+
+check "theme = 'dark' in .claude.json (default option)" \
+    bash -c "jq -e '.theme == \"dark\"' '${TARGET_HOME}/.claude.json'"
+
+check "firstStartTime set in .claude.json" \
+    bash -c "jq -e '(.firstStartTime // 0) > 0' '${TARGET_HOME}/.claude.json'"
+
 # Report result
 reportResults
