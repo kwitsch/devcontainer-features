@@ -130,7 +130,6 @@ CONFIG_ENV="${FEATURE_DIR}/config.env"
     printf 'CLAUDE_PLUGINS=%q\n'               "${PLUGINS-}"
     printf 'CLAUDE_FORWARD_HOST_ONBOARDING=%q\n' "${FORWARDHOSTONBOARDING-true}"
     printf 'CLAUDE_THEME=%q\n'                 "${THEME-}"
-    printf 'CLAUDE_INSTALL_IDE_EXTENSION=%q\n' "${INSTALLIDEEXTENSION-true}"
 } > "$CONFIG_ENV"
 chmod 0644 "$CONFIG_ENV"
 
