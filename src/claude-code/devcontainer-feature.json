@@ -1,6 +1,6 @@
 {
     "id": "claude-code",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "name": "Claude Code + Credentials Bridge",
     "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart.",
     "options": {
