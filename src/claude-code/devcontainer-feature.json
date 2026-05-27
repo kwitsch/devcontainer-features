@@ -54,8 +54,7 @@
         }
     },
     "containerEnv": {
-        "HOST_CLAUDE_MOUNT":     "/host_claude",
-        "CLAUDE_WORKSPACE_PATH": "${containerWorkspaceFolder}"
+        "HOST_CLAUDE_MOUNT": "/host_claude"
     },
     "mounts": [
         {

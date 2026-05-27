@@ -113,6 +113,49 @@ install_for_target() {
     mv "$tmp" "$dst"      # atomar (gleiches Filesystem)
 }
 
+# --- Workspace-Folder ermitteln -------------------------------------------
+# Lifecycle-Skripte laufen per Devcontainer-Spec mit cwd = workspaceFolder,
+# also ist $PWD die primaere Quelle. `containerEnv.${containerWorkspaceFolder}`
+# wird vom Feature-Manifest aus NICHT substituiert (Docker emittiert
+# UndefinedVar und setzt die ENV auf leer/literal), daher hier kein Lookup
+# auf eine Feature-eigene ENV-Variable.
+#
+# Sanity-Checks:
+#   - absoluter Pfad, der existiert
+#   - kein literales "${...}" (Substitution-Reste)
+#   - nicht /
+#
+# Echoes den aufgeloesten Pfad oder leer, wenn nichts Vernuenftiges gefunden
+# wurde.
+resolve_workspace_folder() {
+    local cand
+    for cand in "${1:-}" "${PWD:-}"; do
+        [[ -z "$cand" ]] && continue
+        [[ "$cand" == \$* || "$cand" == \${* ]] && continue
+        [[ "$cand" == /* ]] || continue
+        [[ "$cand" == "/" ]] && continue
+        [[ -d "$cand" ]] || continue
+        printf '%s' "$cand"
+        return 0
+    done
+
+    # Letzter Ausweg: /workspaces/<single-dir> — Standard-Mountpunkt
+    # in VS Code / Codespaces Dev Containers.
+    if [[ -d /workspaces ]]; then
+        local found="" entry
+        for entry in /workspaces/*/; do
+            [[ -d "$entry" ]] || continue
+            if [[ -n "$found" ]]; then
+                # mehrere Kandidaten — nicht raten
+                printf ''
+                return 0
+            fi
+            found="${entry%/}"
+        done
+        [[ -n "$found" ]] && printf '%s' "$found"
+    fi
+}
+
 # Whitespace-Trim (leading + trailing) ohne externe Tools. Internal
 # Whitespace bleibt erhalten — wichtig fuer Pfade mit Leerzeichen in
 # Komma-Listen wie CLAUDE_MARKETPLACES / CLAUDE_PLUGINS.

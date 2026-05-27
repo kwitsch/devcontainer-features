@@ -75,6 +75,12 @@ check "claude launcher executes via direct path" \
 check "workspace trust applied to .claude.json" \
     bash -c "jq -e '.projects | to_entries | length > 0' '${TARGET_HOME}/.claude.json'"
 
+# Regression guard: ensure the workspace key is an actual absolute path
+# (existed once as literal '$containerWorkspaceFolder' when the obsolete
+# containerEnv substitution was still in the manifest).
+check "workspace trust key is an absolute path (no \$ substitution leftover)" \
+    bash -c 'jq -e ".projects | keys | map(startswith(\"/\") and (contains(\"\$\") | not)) | all" "'"${TARGET_HOME}"'/.claude.json"'
+
 check "remoteDialogSeen = true in .claude.json (default)" \
     bash -c "jq -e '.remoteDialogSeen == true' '${TARGET_HOME}/.claude.json'"
 
