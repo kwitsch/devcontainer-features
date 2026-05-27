@@ -1,6 +1,6 @@
 {
     "id": "claude-code",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "name": "Claude Code + Credentials Bridge",
     "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container. Wizard-related Feature options (theme, defaultMode) default to empty so the host's completed wizard state wins; set them explicitly to override.",
     "options": {
@@ -51,11 +51,11 @@
             "default": "",
             "enum": ["", "dark", "light", "dark-daltonized", "light-daltonized", "dark-ansi", "light-ansi"],
             "description": "Theme written to ~/.claude.json. Empty string (default) lets the host's wizard choice through unchanged; set explicitly to force a theme regardless of host. If neither the host nor this option supplies a theme, postStart falls back to 'dark' as a final safety net so the picker never appears."
-        },
-        "installIdeExtension": {
-            "type": "boolean",
-            "default": true,
-            "description": "When true (default) and a VS Code-family CLI (`code`/`code-insiders`/`cursor`) is on the target user's PATH at postCreate time, install the `anthropic.claude-code` extension via `<cli> --install-extension anthropic.claude-code --force`. Silent skip when no CLI is found (Codespaces prebuilds, JetBrains hosts, headless containers)."
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": ["anthropic.claude-code"]
         }
     },
     "containerEnv": {
