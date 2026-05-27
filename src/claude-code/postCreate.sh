@@ -31,6 +31,9 @@ if ! jq -e '.claudeAiOauth.accessToken and .claudeAiOauth.refreshToken' \
 fi
 
 # --- Build minimal .claude.json ------------------------------------------
+# Basis: Account + onboarding-Flag. Ohne weitere Felder reicht das NICHT, um
+# den First-Run-Wizard zu unterdruecken — Claude Code zeigt den Theme-Picker,
+# wenn .theme fehlt, und ggf. Tip-Dialoge, wenn .tipsHistory leer ist.
 extracted_json="$(jq '{
     userID:                 .userID,
     oauthAccount:           .oauthAccount,
@@ -42,6 +45,38 @@ if ! printf '%s' "$extracted_json" | \
     warn "could not extract userID / oauthAccount from ${HOST_JSON} — skipping"
     exit 0
 fi
+
+# Wizard-state vom Host uebernehmen (Whitelist) — sonst kommt der Wizard
+# trotz vorhandenem Login. Workspace-spezifische Felder (projects, mcpServers)
+# bewusst nicht uebernehmen — die werden in postStart.sh per-Workspace gesetzt.
+if [[ "${CLAUDE_FORWARD_HOST_ONBOARDING:-true}" == "true" ]]; then
+    extracted_json="$(printf '%s' "$extracted_json" | jq \
+        --slurpfile host "$HOST_JSON" \
+        '. + ($host[0] | {
+            theme,
+            firstStartTime,
+            tipsHistory,
+            editorMode,
+            autoUpdates,
+            verbose,
+            previewFeaturesOptInList,
+            subscriptionNoticeCount,
+            bypassPermissionsModeAccepted,
+            hasAvailableSubscription
+        } | with_entries(select(.value != null)))')"
+fi
+
+# Option-Override fuer theme (gewinnt gegen Host).
+if [[ -n "${CLAUDE_THEME:-}" ]]; then
+    extracted_json="$(printf '%s' "$extracted_json" | \
+        jq --arg t "$CLAUDE_THEME" '.theme = $t')"
+fi
+
+# Fallback fuer firstStartTime — wenn weder Host noch Option gesetzt, das
+# eine Feld, das Claude Code als Wizard-Trigger nutzt, mit "jetzt" fuellen.
+extracted_json="$(printf '%s' "$extracted_json" | jq '
+    if .firstStartTime == null then .firstStartTime = (now * 1000 | floor) else . end
+')"
 
 # --- Install ---------------------------------------------------------------
 # Harden TARGET_DIR einmalig — install_for_target laesst Parent-Dirs

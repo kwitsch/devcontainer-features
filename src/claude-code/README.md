@@ -1,7 +1,7 @@
 
 # Claude Code + Credentials Bridge (claude-code)
 
-Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart.
+Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container.
 
 ## Example Usage
 
@@ -22,6 +22,8 @@ Pre-warms a Claude Code binary cache in /opt during image build, runs `claude in
 | remoteControlServer | When true, postStart spawns `claude remote-control --spawn worktree` as a long-running background daemon under the target user. Requires the workspace to be a git repository. PID and log under ~/.claude/remote-control.{pid,log}. Independent of the `remoteControl` option above. | boolean | false |
 | marketplaces | Comma-separated list of Claude Code plugin marketplaces to add after credential setup in postCreate. Each item is passed to `claude plugin marketplace add <item>`. Accepts GitHub shorthand (owner/repo), URLs, or local paths. Example: "anthropics/claude-code,my-org/internal" | string | - |
 | plugins | Comma-separated list of plugins to install after marketplaces are added. Each item is passed to `claude plugin install <item>` in the format `<plugin>@<marketplace>`. Example: "formatter@anthropics/claude-code,linter@my-org" | string | - |
+| forwardHostOnboarding | When true (default), postCreate/postStart copy the host's first-run wizard state (theme, tipsHistory, firstStartTime, editorMode, autoUpdates, verbose, previewFeaturesOptInList, subscriptionNoticeCount, bypassPermissionsModeAccepted, hasAvailableSubscription) into the container's ~/.claude.json. Without this the first `claude` invocation re-runs the theme picker / onboarding even though credentials are already present. | boolean | true |
+| theme | Theme written to ~/.claude.json (suppresses the first-run theme picker). Empty string = do not touch the setting; rely on forwardHostOnboarding to source it from the host instead. Default 'dark' guarantees the wizard is skipped even when the host has no .claude.json yet (e.g. logged in via a different mechanism). | string | dark |
 
 > **⚠️ macOS hosts are not supported.** Claude Code on macOS stores OAuth tokens in the system Keychain, not in a file under `~/.claude/`. This Feature reads credentials via a read-only bind mount of `~/.claude/.credentials.json` — which simply does not exist on a macOS host. Use a Linux host, a Windows host with Claude Code installed natively, or WSL2 (with Claude Code installed inside the WSL distribution).
 
@@ -39,10 +41,14 @@ Container lifecycle:
                ── (prebuild-cacheable: result is baked into the prebuild image)
 
     postCreate ── credentials + minimal .claude.json from host bind mount
+               ── wizard-state fields (theme, firstStartTime, tipsHistory, …)
+                  carried forward so first `claude` invocation skips onboarding
                ── marketplace add → plugin install (in that order)
 
     postStart  ── token refresh (if host has newer `expiresAt`)
                ── workspace trust + remoteDialogSeen in ~/.claude.json
+               ── idempotent wizard-state nachziehen (handles host re-login
+                  or older Feature versions that did not write theme)
                ── permissions.defaultMode + remoteControlAtStartup +
                   skipAutoPermissionPrompt / skipDangerousModePermissionPrompt
                   in ~/.claude/settings.json
@@ -105,6 +111,8 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 - `remoteControlServer=true` spawns a long-running `claude remote-control --spawn worktree` *daemon* in `postStart` even when no user is at the terminal. PID + log at `~/.claude/remote-control.{pid,log}`.
 
 **`marketplaces` / `plugins`** — comma-separated strings (devcontainer Feature options do not support native arrays). Items are trimmed of whitespace; empty items are skipped. Order is preserved. Both are only attempted if the credential setup did not soft-fail.
+
+**`forwardHostOnboarding` / `theme`** — suppress the first-run wizard inside the container. A valid login on the host is *not* enough on its own: Claude Code shows the theme picker (and other onboarding dialogs) whenever fields like `theme`, `firstStartTime`, or `tipsHistory` are absent from `~/.claude.json`. With `forwardHostOnboarding=true` (default), `postCreate.sh` copies those wizard-state fields from the host into the container, and `postStart.sh` idempotently nachzieht missing ones on every start (also fixes containers created by older Feature versions that did not write them). `theme` is an option-level override: any non-empty value (default `"dark"`) wins over the host's choice, which is useful for matching the IDE's color scheme regardless of what was picked on the host. As a final safety net, if `theme` would still be empty after all merges, `postStart.sh` forces it to `"dark"` so the picker is guaranteed not to appear.
 
 ## Known upstream issues
 

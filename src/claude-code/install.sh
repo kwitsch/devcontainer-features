@@ -128,6 +128,8 @@ CONFIG_ENV="${FEATURE_DIR}/config.env"
     printf 'CLAUDE_REMOTE_CONTROL_SERVER=%q\n' "${REMOTECONTROLSERVER-false}"
     printf 'CLAUDE_MARKETPLACES=%q\n'          "${MARKETPLACES-}"
     printf 'CLAUDE_PLUGINS=%q\n'               "${PLUGINS-}"
+    printf 'CLAUDE_FORWARD_HOST_ONBOARDING=%q\n' "${FORWARDHOSTONBOARDING-true}"
+    printf 'CLAUDE_THEME=%q\n'                 "${THEME-dark}"
 } > "$CONFIG_ENV"
 chmod 0644 "$CONFIG_ENV"
 
