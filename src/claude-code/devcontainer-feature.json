@@ -1,6 +1,6 @@
 {
     "id": "claude-code",
-    "version": "1.3.0",
+    "version": "1.3.1",
     "name": "Claude Code + Credentials Bridge",
     "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container. Wizard-related Feature options (theme, defaultMode) default to empty so the host's completed wizard state wins; set them explicitly to override.",
     "options": {
