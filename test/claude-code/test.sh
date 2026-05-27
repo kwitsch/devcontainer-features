@@ -115,5 +115,37 @@ check "theme = 'dark' in .claude.json (safety net, host stub has no theme)" \
 check "firstStartTime set in .claude.json" \
     bash -c "jq -e '(.firstStartTime // 0) > 0' '${TARGET_HOME}/.claude.json'"
 
+# --- resolve_release_channel: smoke tests ---------------------------------
+# Sourced after `claude install` ran, so config.env reflects the persisted
+# Feature options. We swap HOST_CLAUDE_MOUNT to point at temp fixtures.
+check "resolve_release_channel falls back to 'latest' without host setting" \
+    bash -c '
+        d="$(mktemp -d)"
+        mkdir -p "$d/.claude" && printf "{}" > "$d/.claude/settings.json"
+        . /usr/local/share/claude-code/_lib.sh
+        export HOST_CLAUDE_MOUNT="$d" CLAUDE_CHANNEL=""
+        [ "$(resolve_release_channel)" = "latest" ]
+    '
+
+check "resolve_release_channel picks 'stable' from host autoUpdatesChannel" \
+    bash -c '
+        d="$(mktemp -d)"
+        mkdir -p "$d/.claude"
+        printf "{\"autoUpdatesChannel\": \"stable\"}" > "$d/.claude/settings.json"
+        . /usr/local/share/claude-code/_lib.sh
+        export HOST_CLAUDE_MOUNT="$d" CLAUDE_CHANNEL=""
+        [ "$(resolve_release_channel)" = "stable" ]
+    '
+
+check "resolve_release_channel: CLAUDE_CHANNEL override beats host setting" \
+    bash -c '
+        d="$(mktemp -d)"
+        mkdir -p "$d/.claude"
+        printf "{\"autoUpdatesChannel\": \"stable\"}" > "$d/.claude/settings.json"
+        . /usr/local/share/claude-code/_lib.sh
+        export HOST_CLAUDE_MOUNT="$d" CLAUDE_CHANNEL="latest"
+        [ "$(resolve_release_channel)" = "latest" ]
+    '
+
 # Report result
 reportResults

@@ -11,9 +11,9 @@
         },
         "channel": {
             "type": "string",
-            "default": "latest",
-            "enum": ["stable", "latest"],
-            "description": "Claude Code release channel passed to `claude install <channel>`. Controls auto-updater behavior."
+            "default": "",
+            "enum": ["", "stable", "latest"],
+            "description": "Claude Code release channel passed to `claude install <channel>`. Empty (default) reads the host's choice from `~/.claude/settings.json` (field `autoUpdatesChannel`, set by `claude install` on the host); falls back to `latest` if the host setting is absent or the bind mount is unavailable (e.g. Codespaces prebuild). Set explicitly to override."
         },
         "defaultMode": {
             "type": "string",

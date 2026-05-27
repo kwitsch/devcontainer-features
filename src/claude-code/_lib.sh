@@ -156,6 +156,36 @@ resolve_workspace_folder() {
     fi
 }
 
+# --- Release-Channel ermitteln --------------------------------------------
+# Praezedenz:
+#   (1) Feature-Option CLAUDE_CHANNEL (wenn non-empty) — Override
+#   (2) Host-Settings `~/.claude/settings.json` Feld `autoUpdatesChannel`
+#       (Claude Code persistiert hier die Wahl von `claude install <channel>`;
+#        Binary-Strings: "Saved autoUpdatesChannel= ... to user settings")
+#   (3) Fallback "latest" — gilt fuer Codespaces-Prebuilds (kein Host-Mount)
+#       oder Hosts, die den Wert nicht gesetzt haben.
+#
+# Akzeptierte Werte: "stable" | "latest". Andere Werte werden verworfen und
+# fallen auf den naechsten Schritt durch.
+resolve_release_channel() {
+    local override="${CLAUDE_CHANNEL:-}"
+    case "$override" in
+        stable|latest) printf '%s' "$override"; return ;;
+    esac
+
+    local host_settings="${HOST_CLAUDE_MOUNT:-/host_claude}/.claude/settings.json"
+    if command -v jq >/dev/null 2>&1 && [[ -r "$host_settings" ]] && \
+       jq -e . "$host_settings" >/dev/null 2>&1; then
+        local val
+        val="$(jq -r '.autoUpdatesChannel // empty' "$host_settings" 2>/dev/null || true)"
+        case "$val" in
+            stable|latest) printf '%s' "$val"; return ;;
+        esac
+    fi
+
+    printf 'latest'
+}
+
 # Whitespace-Trim (leading + trailing) ohne externe Tools. Internal
 # Whitespace bleibt erhalten — wichtig fuer Pfade mit Leerzeichen in
 # Komma-Listen wie CLAUDE_MARKETPLACES / CLAUDE_PLUGINS.

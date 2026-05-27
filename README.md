@@ -26,7 +26,7 @@ Selected options (full list in [`src/claude-code/devcontainer-feature.json`](src
 | Option | Default | Description |
 |---|---|---|
 | `targetUser` | `""` (auto-detect) | Container user that should own credentials and run `claude install`. Empty = first non-root login-capable user (lowest UID ≥ 1000). |
-| `channel` | `latest` | `claude install <channel>` — `stable` or `latest`. |
+| `channel` | `""` (host wins) | `claude install <channel>` — `stable` or `latest`. Empty (default) reads the host's `~/.claude/settings.json` `autoUpdatesChannel` (written by `claude install` on the host); falls back to `latest` when the host setting is absent or the bind mount is unavailable (Codespaces prebuild). |
 | `defaultMode` | `""` (host wins) | `permissions.defaultMode` in `~/.claude/settings.json`. Empty (default) leaves whatever the host wizard wrote untouched; set explicitly to override. `auto` also writes `skipAutoPermissionPrompt=true` to pre-accept the one-time opt-in dialog; `bypassPermissions` also writes `skipDangerousModePermissionPrompt=true`. |
 | `remoteControl` | `true` | Sets `remoteControlAtStartup=true` in `~/.claude/settings.json` (where Claude Code ≥ 2.1.83 reads it) and `remoteDialogSeen=true` in `~/.claude.json` so every interactive `claude` session auto-registers for Remote Control without prompting. |
 | `remoteControlServer` | `false` | Spawns `claude remote-control --spawn worktree` as a long-running daemon (workspace must be a git repo). |

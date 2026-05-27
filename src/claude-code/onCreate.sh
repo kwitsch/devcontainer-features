@@ -7,17 +7,19 @@
 #
 # Voraussetzungen (von Feature):
 #   - /opt/claude-code/cache/claude existiert (von install.sh)
-#   - CLAUDE_CHANNEL gesetzt (stable|latest, default stable)
 #   - CLAUDE_TARGET_USER optional gesetzt; sonst Auto-Detect
+#
+# Channel-Aufloesung (siehe resolve_release_channel in _lib.sh):
+#   Feature-Option CLAUDE_CHANNEL -> Host-Settings -> Fallback "latest".
+#   Im Prebuild-Pfad (kein Host-Mount) greift der Fallback; das ist OK,
+#   weil postCreate/postStart spaeter ohnehin gegen den Host abgleichen
+#   und ein Reinstall nicht noetig ist, solange autoUpdates aktiv sind.
 #
 # Effekt:
 #   - Fuehrt `claude install <channel>` als Target-User aus.
 #   - Erzeugt ~/.local/bin/claude (Symlink) +
 #     ~/.local/share/claude/versions/<v>/ (Binary).
 #   - Konfiguriert Shell-Integration (PATH-Eintrag in ~/.bashrc o.ae.).
-#
-# WICHTIG: Dieser Schritt nutzt KEINEN Host-Bind-Mount und darf daher
-# auch in Prebuild-Umgebungen laufen, in denen `/host_claude/...` fehlt.
 
 set -euo pipefail
 
@@ -25,7 +27,7 @@ SCRIPT_TAG="claude-bootstrap"
 . "$(dirname "$(readlink -f "$0")")/_lib.sh"
 
 CC_CACHE_BIN="/opt/claude-code/cache/claude"
-CC_CHANNEL="${CLAUDE_CHANNEL:-stable}"
+CC_CHANNEL="$(resolve_release_channel)"
 
 resolve_target_paths
 

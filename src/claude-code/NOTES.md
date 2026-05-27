@@ -77,6 +77,8 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 
 ## Configuration option notes
 
+**`channel`** — defaults to empty so the host's chosen update channel wins. `claude install <channel>` on the host persists `autoUpdatesChannel: "stable"|"latest"` to `~/.claude/settings.json`; `onCreate.sh` reads that field via the bind mount (`/host_claude/.claude/settings.json`) and passes it to `claude install <channel>` inside the container. Fallback is `latest` when (a) the host setting is absent, (b) jq is unavailable, or (c) the bind mount is missing (typically Codespaces prebuilds). Setting the option explicitly always wins.
+
 **`defaultMode`** — defaults to empty so the value the host wizard wrote (if any) survives into the container. Set explicitly to override. Notable values: `"auto"` is Anthropic's ML-classifier permission mode (requires Claude Code ≥ 2.1.83 and a Pro/Max/Team/Enterprise account; the first cycle into auto mode per account otherwise shows a one-time opt-in dialog — this Feature pre-accepts it by writing `skipAutoPermissionPrompt=true` alongside `permissions.defaultMode="auto"` into `~/.claude/settings.json`). For `defaultMode = "bypassPermissions"` the analogue `skipDangerousModePermissionPrompt=true` is written.
 
 **`remoteControl`** vs. **`remoteControlServer`** — these are independent:
