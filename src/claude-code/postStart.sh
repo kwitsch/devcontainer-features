@@ -170,8 +170,11 @@ fi
 WORKSPACE="$(resolve_workspace_folder)"
 REMOTE_CONTROL="${CLAUDE_REMOTE_CONTROL:-true}"
 
-# Liste der zu trustenden Pfade aufbauen (Dedup ueber assoziatives Array).
-declare -A trust_set=()
+# Liste der zu trustenden Pfade aufbauen (Dedup ueber lineare Suche —
+# bewusst indexed array statt `declare -A`, weil indirekte Expansion
+# `${!arr[*]:-<none>}` von Associative Arrays in einigen bash-Versionen
+# zu "invalid variable name" fuehrt).
+trust_paths=()
 add_trust_path() {
     # Unter `set -e` muss diese Funktion immer mit 0 zurueckkehren — eine
     # nicht-zutreffende Guard-Bedingung ist kein Fehler.
@@ -179,7 +182,11 @@ add_trust_path() {
     if [[ -z "$p" || "$p" == "/" ]]; then return 0; fi
     if [[ "$p" != /* ]];             then return 0; fi
     if [[ ! -d "$p" ]];              then return 0; fi
-    trust_set["$p"]=1
+    local existing
+    for existing in ${trust_paths[@]+"${trust_paths[@]}"}; do
+        if [[ "$existing" == "$p" ]]; then return 0; fi
+    done
+    trust_paths+=("$p")
     return 0
 }
 
@@ -191,7 +198,7 @@ fi
 if [[ -d /workspaces ]]; then
     add_trust_path "/workspaces"
     for d in /workspaces/*/; do
-        [[ -d "$d" ]] && add_trust_path "${d%/}"
+        if [[ -d "$d" ]]; then add_trust_path "${d%/}"; fi
     done
 fi
 
@@ -206,10 +213,10 @@ fi
 # in der Datei und stiftet Verwirrung. Der echte Wert sitzt in settings.json.
 desired="$(printf '%s' "$desired" | jq 'del(.remoteControlAtStartup)')"
 
-if (( ${#trust_set[@]} == 0 )); then
+if [[ ${#trust_paths[@]} -eq 0 ]]; then
     warn "no trustable paths found (PWD invalid, /workspaces missing) — workspace-trust skipped"
 else
-    for p in "${!trust_set[@]}"; do
+    for p in "${trust_paths[@]}"; do
         desired="$(printf '%s' "$desired" | jq --arg ws "$p" '
             .projects = ((.projects // {}) | .[$ws] = ((.[$ws] // {})
                 | .hasTrustDialogAccepted        = true
@@ -219,9 +226,13 @@ else
     done
 fi
 
+trust_summary="<none>"
+if [[ ${#trust_paths[@]} -gt 0 ]]; then
+    trust_summary="${trust_paths[*]}"
+fi
 if [[ "$(printf '%s' "$current"  | jq -S .)" != \
       "$(printf '%s' "$desired"  | jq -S .)" ]]; then
-    log "patching .claude.json (remoteControl=${REMOTE_CONTROL}, trusted paths: ${!trust_set[*]:-<none>})"
+    log "patching .claude.json (remoteControl=${REMOTE_CONTROL}, trusted paths: ${trust_summary})"
     tmp_file="$(mktemp)"
     printf '%s\n' "$desired" > "$tmp_file"
     install_for_target "$tmp_file" "$TARGET_JSON" 600
