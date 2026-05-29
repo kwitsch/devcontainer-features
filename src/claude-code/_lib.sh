@@ -264,6 +264,13 @@ apply_user_claude_md() {
         used_host="yes"
     fi
 
+    # Trailing-Newlines normalisieren: der Idempotenz-Vergleich unten liest
+    # die Datei via `$(cat …)`, was *alle* Trailing-Newlines strippt. Ein
+    # claudeMd-Wert (oder zusammengesetzter body), der auf "\n" endet, wuerde
+    # sonst bei JEDEM postStart einen unnoetigen Rewrite ausloesen, weil der
+    # in-memory body die Newlines behaelt, die on-disk-Variante aber nicht.
+    while [[ "$body" == *$'\n' ]]; do body="${body%$'\n'}"; done
+
     if [[ -z "$body" ]]; then
         log "no CLAUDE.md content (option empty, host merge disabled or host file absent) — skipping"
         return 0
