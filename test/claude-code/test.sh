@@ -115,6 +115,19 @@ check "theme = 'dark' in .claude.json (safety net, host stub has no theme)" \
 check "firstStartTime set in .claude.json" \
     bash -c "jq -e '(.firstStartTime // 0) > 0' '${TARGET_HOME}/.claude.json'"
 
+# --- User-CLAUDE.md: hostClaudeMerge=true (default) merges host stub ------
+# CI workflow stubs $HOME/.claude/CLAUDE.md on the runner before invoking
+# `devcontainer features test`, so the bind mount carries the marker into
+# /host_claude/.claude/CLAUDE.md and apply_user_claude_md should copy it.
+check "user CLAUDE.md exists in target home (default merge)" \
+    test -f "${TARGET_HOME}/.claude/CLAUDE.md"
+
+check "user CLAUDE.md is owned by target user" \
+    bash -c '[[ "$(stat -c %U "'"${TARGET_HOME}"'/.claude/CLAUDE.md")" = "'"${TARGET_USER}"'" ]]'
+
+check "user CLAUDE.md contains the host stub marker" \
+    grep -q "ci-stub-host-memory" "${TARGET_HOME}/.claude/CLAUDE.md"
+
 # --- resolve_release_channel: smoke tests ---------------------------------
 # Sourced after `claude install` ran, so config.env reflects the persisted
 # Feature options. We swap HOST_CLAUDE_MOUNT to point at temp fixtures.

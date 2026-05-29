@@ -36,5 +36,15 @@
                 "marketplaces": "anthropics/claude-code"
             }
         }
+    },
+    "with-claude-md": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "claudeMd": "# Option-injected\nHello from option",
+                "hostClaudeMerge": false
+            }
+        }
     }
 }

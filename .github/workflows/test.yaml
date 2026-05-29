@@ -42,6 +42,10 @@ jobs:
             }
           }
           EOF
+          cat > "$HOME/.claude/CLAUDE.md" <<'EOF'
+          # ci-stub-host-memory
+          this comes from the host
+          EOF
 
       - name: "Generating tests for '${{ matrix.features }}' against '${{ matrix.baseImage }}'"
         run: devcontainer features test --skip-scenarios -f ${{ matrix.features }} -i ${{ matrix.baseImage }} .
@@ -77,6 +81,10 @@ jobs:
               "emailAddress": "ci@example.com"
             }
           }
+          EOF
+          cat > "$HOME/.claude/CLAUDE.md" <<'EOF'
+          # ci-stub-host-memory
+          this comes from the host
           EOF
 
       - name: "Generating tests for '${{ matrix.features }}' scenarios"
