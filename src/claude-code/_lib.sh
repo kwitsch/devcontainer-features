@@ -220,6 +220,91 @@ apply_workspace_trust() {
     fi
 }
 
+# --- User-CLAUDE.md zusammensetzen ----------------------------------------
+# Schreibt ${TARGET_DIR}/CLAUDE.md aus zwei Quellen:
+#   (1) CLAUDE_CLAUDEMD            — literal Option-Inhalt (wenn non-empty)
+#   (2) ${HOST_DIR}/.claude/CLAUDE.md — wenn CLAUDE_HOST_CLAUDE_MERGE=true
+#                                       und Datei via Bind-Mount lesbar ist
+# Trennung zwischen Option-Block und Host-Block: eine Leerzeile ("\n\n").
+#
+# Beide Quellen leer/abwesend → Funktion no-op (bestehende Container-Datei
+# wird NICHT angefasst).
+#
+# Idempotent: aus postCreate UND postStart aufgerufen; vergleicht den
+# berechneten Body mit dem on-disk Inhalt und schreibt nur bei Diff.
+#
+# Voraussetzung: resolve_target_paths wurde vorher aufgerufen
+# (TARGET_USER / TARGET_HOME / TARGET_DIR muessen gesetzt sein).
+# HOST_DIR wird optional aus dem Caller-Scope uebernommen; sonst Fallback
+# auf den Standard-Mount-Pfad (containerEnv setzt HOST_CLAUDE_MOUNT).
+apply_user_claude_md() {
+    if [[ -z "${TARGET_DIR:-}" ]]; then
+        warn "TARGET_DIR not set — call resolve_target_paths first"
+        return 0
+    fi
+
+    local host_md="${HOST_DIR:-${HOST_CLAUDE_MOUNT:-/host_claude}}/.claude/CLAUDE.md"
+    local opt="${CLAUDE_CLAUDEMD:-}"
+    local merge="${CLAUDE_HOST_CLAUDE_MERGE:-true}"
+    local body=""
+    local used_host="no"
+
+    if [[ -n "$opt" ]]; then
+        body="$opt"
+    fi
+
+    if [[ "$merge" == "true" && -r "$host_md" ]]; then
+        local host_content
+        host_content="$(cat "$host_md")"
+        if [[ -n "$body" ]]; then
+            body="${body}"$'\n\n'"${host_content}"
+        else
+            body="$host_content"
+        fi
+        used_host="yes"
+    fi
+
+    # Trailing-Newlines normalisieren: der Idempotenz-Vergleich unten liest
+    # die Datei via `$(cat …)`, was *alle* Trailing-Newlines strippt. Ein
+    # claudeMd-Wert (oder zusammengesetzter body), der auf "\n" endet, wuerde
+    # sonst bei JEDEM postStart einen unnoetigen Rewrite ausloesen, weil der
+    # in-memory body die Newlines behaelt, die on-disk-Variante aber nicht.
+    while [[ "$body" == *$'\n' ]]; do body="${body%$'\n'}"; done
+
+    if [[ -z "$body" ]]; then
+        log "no CLAUDE.md content (option empty, host merge disabled or host file absent) — skipping"
+        return 0
+    fi
+
+    local dst="${TARGET_DIR}/CLAUDE.md"
+
+    # Idempotenz: bei identischem on-disk Inhalt nicht schreiben.
+    # `$(cat …)` strippt trailing newlines — `printf '%s\n'` unten schreibt
+    # genau einen Trailing-Newline, also matched der Vergleich gegen den
+    # in-memory body.
+    if [[ -f "$dst" ]] && [[ "$(cat "$dst")" == "$body" ]]; then
+        log "${dst} up-to-date — skipping"
+        return 0
+    fi
+
+    # TARGET_DIR sicherstellen + harden (idempotent — postCreate's
+    # credential-install Block macht das spaeter ohnehin nochmal).
+    mkdir -p "$TARGET_DIR"
+    chmod 700 "$TARGET_DIR"
+    if [[ "$(id -u)" -eq 0 ]]; then
+        chown "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
+    fi
+
+    local tmp; tmp="$(mktemp)"
+    printf '%s\n' "$body" > "$tmp"
+    install_for_target "$tmp" "$dst" 644
+    rm -f "$tmp"
+
+    local opt_marker
+    if [[ -n "$opt" ]]; then opt_marker="yes"; else opt_marker="no"; fi
+    log "wrote ${dst} (option=${opt_marker}, hostMerge=${used_host})"
+}
+
 # --- Release-Channel ermitteln --------------------------------------------
 # Praezedenz:
 #   (1) Feature-Option CLAUDE_CHANNEL (wenn non-empty) — Override

@@ -1,8 +1,8 @@
 {
     "id": "claude-code",
-    "version": "1.4.2",
+    "version": "1.5.0",
     "name": "Claude Code + Credentials Bridge",
-    "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container. Wizard-related Feature options (theme, defaultMode) default to empty so the host's completed wizard state wins; set them explicitly to override.",
+    "description": "Pre-warms a Claude Code binary cache in /opt during image build, runs `claude install <channel>` as the target user on onCreate (prebuild-cacheable), and forwards host OAuth credentials + workspace trust + remote-control + auto-mode on postCreate/postStart. Skips the first-run wizard by carrying the host's onboarding state (theme, tips, editor mode, …) into the container, and optionally synthesizes a user-level `~/.claude/CLAUDE.md` from a literal option string and/or the host's `~/.claude/CLAUDE.md`. Wizard-related Feature options (theme, defaultMode) default to empty so the host's completed wizard state wins; set them explicitly to override.",
     "options": {
         "targetUser": {
             "type": "string",
@@ -51,6 +51,16 @@
             "default": "",
             "enum": ["", "dark", "light", "dark-daltonized", "light-daltonized", "dark-ansi", "light-ansi"],
             "description": "Theme written to ~/.claude.json. Empty string (default) lets the host's wizard choice through unchanged; set explicitly to force a theme regardless of host. If neither the host nor this option supplies a theme, postStart falls back to 'dark' as a final safety net so the picker never appears."
+        },
+        "claudeMd": {
+            "type": "string",
+            "default": "",
+            "description": "Literal markdown content prepended to the container's `~/.claude/CLAUDE.md` (user-level memory loaded by every `claude` session). Empty (default) contributes nothing — host content alone wins if `hostClaudeMerge` is true. Written via postCreate and re-applied on every postStart, so container-side edits will be overwritten on next start whenever the computed body differs."
+        },
+        "hostClaudeMerge": {
+            "type": "boolean",
+            "default": true,
+            "description": "When true (default), appends the host's `~/.claude/CLAUDE.md` content (via the bind mount at `/host_claude/.claude/CLAUDE.md`) after the `claudeMd` option content, separated by a blank line. Silently skipped when the host file is absent or unreadable. Combined with `claudeMd=\"\"` and host file present, the host CLAUDE.md is mirrored verbatim into the container."
         }
     },
     "customizations": {
