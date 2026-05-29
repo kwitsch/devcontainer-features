@@ -384,3 +384,56 @@ run_as_target_background() {
     fi
     echo "$pid"
 }
+
+# --- statusLine-Scripts aus dem Host-Mount verlinken ----------------------
+# Durchsucht den uebergebenen statusLine-command-String nach Tokens der Form
+# ~/.claude/<rel> bzw. $HOME/.claude/<rel> und legt fuer jede Datei, die im
+# Host-Mount (/host_claude/.claude/<rel>) existiert, einen Symlink
+# ${TARGET_DIR}/<rel> -> ${HOST_CLAUDE_MOUNT}/.claude/<rel> an, damit der
+# unveraenderte command im Container funktioniert.
+#
+# Bewusste Grenzen (vgl. NOTES.md): nur ~/.claude/-Pfade werden behandelt;
+# absolute Host-Home-Pfade, `npx ...` oder inline-commands bekommen keinen
+# Symlink (die Config wird trotzdem gespiegelt). Eine bereits existierende
+# *regulaere* Datei am Ziel wird NICHT ueberschrieben (nur warn).
+# `ln -sfn` ist idempotent.
+#
+# Voraussetzung: resolve_target_paths wurde aufgerufen (TARGET_DIR/TARGET_USER).
+link_host_statusline_scripts() {
+    local command_str="$1"
+    [[ -n "$command_str" ]] || return 0
+    [[ -n "${TARGET_DIR:-}" ]] || { warn "link_host_statusline_scripts: TARGET_DIR not set"; return 0; }
+
+    local host_dir="${HOST_CLAUDE_MOUNT:-/host_claude}/.claude"
+    local tok rel src dst dstdir
+    while IFS= read -r tok; do
+        [[ -z "$tok" ]] && continue
+        rel="${tok#*/.claude/}"
+        # Kein .claude/-Praefix gefunden -> ueberspringen.
+        [[ -n "$rel" && "$rel" != "$tok" ]] || continue
+
+        src="${host_dir}/${rel}"
+        dst="${TARGET_DIR}/${rel}"
+
+        if [[ ! -e "$src" ]]; then
+            log "statusLine references ${tok} but ${src} not in host mount — skipping symlink"
+            continue
+        fi
+        if [[ -e "$dst" && ! -L "$dst" ]]; then
+            warn "refusing to overwrite regular file ${dst} with statusLine symlink"
+            continue
+        fi
+
+        dstdir="$(dirname "$dst")"
+        if [[ ! -d "$dstdir" ]]; then
+            mkdir -p "$dstdir"
+            if [[ "$(id -u)" -eq 0 ]]; then
+                chown "${TARGET_USER}:${TARGET_USER}" "$dstdir" 2>/dev/null || true
+            fi
+        fi
+
+        log "linking statusLine script ${dst} -> ${src}"
+        run_as_target ln -sfn "$src" "$dst"
+    done < <(printf '%s\n' "$command_str" \
+        | grep -oE '(~|\$HOME)/\.claude/[^[:space:];|&"()<>]+' || true)
+}
