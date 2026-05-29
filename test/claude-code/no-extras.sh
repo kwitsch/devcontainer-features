@@ -1,8 +1,10 @@
 #!/bin/bash
-# Scenario: defaultMode="" (skip), remoteControl=false, remoteControlServer=false
+# Scenario: defaultMode="" (skip), remoteControl=false, remoteControlServer=false,
+# useHostStatusbar=false
 # Verifies that .claude.json gets only workspace trust (no remoteDialogSeen),
 # and settings.json is NOT touched (no defaultMode, no remoteControlAtStartup,
-# no skip*Permission flags from this Feature).
+# no skip*Permission flags from this Feature) — and that with useHostStatusbar=false
+# the host's statusLine is NOT mirrored into settings.json.
 
 set -e
 source dev-container-features-test-lib
@@ -35,6 +37,13 @@ check "settings.json has no skipAutoPermissionPrompt when defaultMode is empty" 
     bash -c "
         if [ -f '${TARGET_HOME}/.claude/settings.json' ]; then
             jq -e '(.skipAutoPermissionPrompt // null) != true' '${TARGET_HOME}/.claude/settings.json'
+        fi
+    "
+
+check "settings.json has no statusLine when useHostStatusbar=false" \
+    bash -c "
+        if [ -f '${TARGET_HOME}/.claude/settings.json' ]; then
+            jq -e '(.statusLine // null) == null' '${TARGET_HOME}/.claude/settings.json'
         fi
     "
 

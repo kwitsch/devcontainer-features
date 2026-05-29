@@ -26,6 +26,7 @@ Pre-warms a Claude Code binary cache in /opt during image build, runs `claude in
 | theme | Theme written to ~/.claude.json. Empty string (default) lets the host's wizard choice through unchanged; set explicitly to force a theme regardless of host. If neither the host nor this option supplies a theme, postStart falls back to 'dark' as a final safety net so the picker never appears. | string | - |
 | claudeMd | Literal markdown content prepended to the container's `~/.claude/CLAUDE.md` (user-level memory loaded by every `claude` session). Empty (default) contributes nothing — host content alone wins if `hostClaudeMerge` is true. Written via postCreate and re-applied on every postStart, so container-side edits will be overwritten on next start whenever the computed body differs. | string | - |
 | hostClaudeMerge | When true (default), appends the host's `~/.claude/CLAUDE.md` content (via the bind mount at `/host_claude/.claude/CLAUDE.md`) after the `claudeMd` option content, separated by a blank line. Silently skipped when the host file is absent or unreadable. Combined with `claudeMd=""` and host file present, the host CLAUDE.md is mirrored verbatim into the container. | boolean | true |
+| useHostStatusbar | When true (default), mirrors the host's ~/.claude/settings.json `statusLine` into the container's ~/.claude/settings.json. For a command referencing a script under ~/.claude/ (or $HOME/.claude/), a symlink ~/.claude/<name> -> /host_claude/.claude/<name> is created so the host's status-line script runs unchanged. Strict mirror: when false — or when the host has no statusLine — the statusLine key is removed from the container settings. Only scripts under ~/.claude/ are linked; absolute host-home paths are not resolved inside the container. | boolean | true |
 
 ## Customizations
 
@@ -60,6 +61,8 @@ Container lifecycle:
                ── permissions.defaultMode + remoteControlAtStartup +
                   skipAutoPermissionPrompt / skipDangerousModePermissionPrompt
                   in ~/.claude/settings.json
+               ── useHostStatusbar: mirror host statusLine into settings.json
+                  + symlink referenced ~/.claude/ scripts from the host mount
                ── optional: spawn `claude remote-control --spawn worktree` daemon
 ```
 
@@ -110,6 +113,7 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 | Host account switched (different `userID`) | `postStart` merges the new account fields into the existing `.claude.json` without losing workspace trust + remote-control settings. |
 | Workspace trust dialog | `postStart` writes `hasTrustDialogAccepted=true` + `hasCompletedProjectOnboarding=true` under `.projects[<path>]` for every immediate subdir of `/workspaces` — Claude checks trust per exact-path against the cwd, so the `/workspaces` parent itself is intentionally **not** added (would be a dead entry), and every repo opened from `/workspaces/*` stays trusted. |
 | Concurrent reads during token refresh | `postStart.sh` writes (credential refresh, `.claude.json` patch, `settings.json` patch) go through a `mktemp` + atomic `mv` helper on the same filesystem. The initial install in `postCreate.sh` uses plain `cp` / shell redirects after the host mount has been validated. |
+| Host status-line script | With `useHostStatusbar=true`, `postStart` mirrors the host's `settings.json` `statusLine` into the container and symlinks any `~/.claude/`-scoped script from the read-only mount, so the unchanged command runs. Strict mirror: `false` or a host without `statusLine` removes the key. Only `~/.claude/` paths are linked — absolute host-home paths are not resolved. A pre-existing regular file at the link target is never overwritten. |
 
 ## Configuration option notes
 
@@ -134,6 +138,8 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 
 Both empty/absent → the Feature does not touch any existing `~/.claude/CLAUDE.md` in the container. With `claudeMd=""` and `hostClaudeMerge=true`, the host file is mirrored verbatim into the container. Re-applied on every `postStart` with a diff-check, so identical content is a no-op but **container-side edits to `~/.claude/CLAUDE.md` will be overwritten on the next start whenever the computed body differs** (intentional, analogous to credential refresh). If you want the container's copy to be authoritative once written, set both options to neutralize the helper: `claudeMd=""` and `hostClaudeMerge=false`.
 
+**`useHostStatusbar`** — defaults to `true`. Claude Code's status line lives under `statusLine` in `~/.claude/settings.json` (typically `{ "type": "command", "command": "~/.claude/statusline.sh" }`). When enabled, `postStart.sh` mirrors the host's `statusLine` into the container's `settings.json` and, for any script referenced via `~/.claude/...` or `$HOME/.claude/...`, creates a symlink `~/.claude/<name>` → `/host_claude/.claude/<name>` so the unchanged command resolves against the read-only host mount. The symlink target is the absolute mount path and is recreated idempotently on every `postStart` (self-healing). The behavior is a strict mirror of the host: with `useHostStatusbar=false`, or when the host has no `statusLine`, the key is removed from the container settings. **Scope limitation:** only scripts under `~/.claude/` are linked. A `command` that points at an absolute host-home path (`/home/<hostuser>/.claude/...`), runs `npx`, or is an inline shell snippet is still copied verbatim, but no symlink is created — an absolute host path will not resolve inside the container. A pre-existing regular file at the symlink target is left untouched (only a warning is logged).
+
 ## Known upstream issues
 
 - **`remoteControlServer` may fail on Claude Code 2.1.98** — the session-creation API rejects the v2.1.98 payload with HTTP 400 *"Extra inputs are not permitted"* ([anthropics/claude-code#45975](https://github.com/anthropics/claude-code/issues/45975)). The daemon spawns correctly, but the bridge to claude.ai fails. Awaiting Anthropic fix.
@@ -153,4 +159,4 @@ Both empty/absent → the Feature does not touch any existing `~/.claude/CLAUDE.
 
 ---
 
-_Note: This file was auto-generated from the [devcontainer-feature.json](https://github.com/kwitsch/devcontainer-features/blob/main/src/claude-code/devcontainer-feature.json).  Add additional notes to a `NOTES.md`._
+_Note: This file was auto-generated from the [devcontainer-feature.json](devcontainer-feature.json).  Add additional notes to a `NOTES.md`._

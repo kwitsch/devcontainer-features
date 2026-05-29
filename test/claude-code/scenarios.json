@@ -15,7 +15,8 @@
             "claude-code": {
                 "defaultMode": "",
                 "remoteControl": false,
-                "remoteControlServer": false
+                "remoteControlServer": false,
+                "useHostStatusbar": false
             }
         }
     },
@@ -44,6 +45,15 @@
             "claude-code": {
                 "claudeMd": "# Option-injected\nHello from option",
                 "hostClaudeMerge": false
+            }
+        }
+    },
+    "with-statusbar": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "remoteUser": "vscode",
+        "features": {
+            "claude-code": {
+                "useHostStatusbar": true
             }
         }
     }
