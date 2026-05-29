@@ -26,6 +26,7 @@ Pre-warms a Claude Code binary cache in /opt during image build, runs `claude in
 | theme | Theme written to ~/.claude.json. Empty string (default) lets the host's wizard choice through unchanged; set explicitly to force a theme regardless of host. If neither the host nor this option supplies a theme, postStart falls back to 'dark' as a final safety net so the picker never appears. | string | - |
 | claudeMd | Literal markdown content prepended to the container's `~/.claude/CLAUDE.md` (user-level memory loaded by every `claude` session). Empty (default) contributes nothing — host content alone wins if `hostClaudeMerge` is true. Written via postCreate and re-applied on every postStart, so container-side edits will be overwritten on next start whenever the computed body differs. | string | - |
 | hostClaudeMerge | When true (default), appends the host's `~/.claude/CLAUDE.md` content (via the bind mount at `/host_claude/.claude/CLAUDE.md`) after the `claudeMd` option content, separated by a blank line. Silently skipped when the host file is absent or unreadable. Combined with `claudeMd=""` and host file present, the host CLAUDE.md is mirrored verbatim into the container. | boolean | true |
+| useHostStatusbar | When true (default), mirrors the host's ~/.claude/settings.json `statusLine` into the container's ~/.claude/settings.json. For a command referencing a script under ~/.claude/ (or $HOME/.claude/), a symlink ~/.claude/<name> -> /host_claude/.claude/<name> is created so the host's status-line script runs unchanged. Strict mirror: when false — or when the host has no statusLine — the statusLine key is removed from the container settings. Only scripts under ~/.claude/ are linked; absolute host-home paths are not resolved inside the container. | boolean | true |
 
 ## Customizations
 
@@ -153,4 +154,4 @@ Both empty/absent → the Feature does not touch any existing `~/.claude/CLAUDE.
 
 ---
 
-_Note: This file was auto-generated from the [devcontainer-feature.json](https://github.com/kwitsch/devcontainer-features/blob/main/src/claude-code/devcontainer-feature.json).  Add additional notes to a `NOTES.md`._
+_Note: This file was auto-generated from the [devcontainer-feature.json](devcontainer-feature.json).  Add additional notes to a `NOTES.md`._

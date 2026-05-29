@@ -132,6 +132,7 @@ CONFIG_ENV="${FEATURE_DIR}/config.env"
     printf 'CLAUDE_THEME=%q\n'                 "${THEME-}"
     printf 'CLAUDE_CLAUDEMD=%q\n'              "${CLAUDEMD-}"
     printf 'CLAUDE_HOST_CLAUDE_MERGE=%q\n'     "${HOSTCLAUDEMERGE-true}"
+    printf 'CLAUDE_USE_HOST_STATUSBAR=%q\n'    "${USEHOSTSTATUSBAR-true}"
 } > "$CONFIG_ENV"
 chmod 0644 "$CONFIG_ENV"
 
