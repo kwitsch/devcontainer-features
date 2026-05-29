@@ -34,6 +34,8 @@ Selected options (full list in [`src/claude-code/devcontainer-feature.json`](src
 | `plugins` | `""` | Comma-separated `<plugin>@<marketplace>` items passed to `claude plugin install`. |
 | `forwardHostOnboarding` | `true` | Carry the host's first-run wizard state (`theme`, `tipsHistory`, `firstStartTime`, `editorMode`, …) into the container so `claude` skips the theme picker / onboarding on first invocation. |
 | `theme` | `""` (host wins) | Theme written to `~/.claude.json`. Empty (default) preserves whatever `forwardHostOnboarding` copied from the host; set explicitly to force a theme. Final safety net forces `"dark"` if no value is set anywhere (host has no `.claude.json`, option not set), so the picker is guaranteed not to appear. |
+| `claudeMd` | `""` | Literal markdown prepended to the container's `~/.claude/CLAUDE.md` (user-level memory). Empty (default) contributes nothing; combine with `hostClaudeMerge=true` to mirror the host CLAUDE.md verbatim, or set explicitly to add container-specific instructions. Re-applied on every `postStart` — container-side edits are overwritten when the computed body differs. |
+| `hostClaudeMerge` | `true` | When the host's `~/.claude/CLAUDE.md` is readable via the bind mount, its content is appended after the `claudeMd` block (separated by a blank line). Silently skipped when the host file is absent. Set to `false` together with `claudeMd=""` to disable the helper entirely. |
 
 The Feature also declares `anthropic.claude-code` in `customizations.vscode.extensions`, so VS Code Remote / Codespaces / Cursor install the extension automatically on attach (no Feature option — declarative path via the IDE's own marketplace integration; non-VS-Code hosts ignore the hint).
 

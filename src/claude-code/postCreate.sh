@@ -25,6 +25,11 @@ resolve_target_paths
 # unterdrueckt wird (Claude haengt sonst beim ersten Aufruf am Trust-Prompt).
 apply_workspace_trust
 
+# --- User-CLAUDE.md (unabhaengig von Host-Creds) --------------------------
+# Auch hier vor dem Soft-Exit, damit die claudeMd-Option auch ohne Host-Login
+# greift. Die Host-Merge-Branch checked selbst auf -r und faellt sonst weg.
+apply_user_claude_md
+
 # --- Validate host mount ---------------------------------------------------
 [[ -r "$HOST_CREDS" ]] || { log "no host credentials at ${HOST_CREDS} — skipping"; exit 0; }
 [[ -r "$HOST_JSON"  ]] || { log "no ${HOST_JSON} — skipping";                       exit 0; }

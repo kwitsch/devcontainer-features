@@ -157,6 +157,12 @@ fi
 #          der Workspace zwischen den Starts geaendert wurde).
 apply_workspace_trust
 
+# --- (3c) User-CLAUDE.md (idempotent re-apply — postCreate hat das beim
+#          Create schon einmal geschrieben, hier ziehen wir Aenderungen am
+#          Host-File nach. Diff-Check innerhalb der Funktion skippt das
+#          Schreiben, wenn der berechnete Inhalt identisch ist).
+apply_user_claude_md
+
 # --- (3b) remoteDialogSeen + remoteControlAtStartup-Migration in .claude.json
 #         remoteDialogSeen:  Top-level Flag — nur wenn remoteControl=true
 #                            (sonst erscheint der einmalige Remote-Control-

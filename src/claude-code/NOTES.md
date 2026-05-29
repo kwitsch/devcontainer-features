@@ -92,6 +92,13 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 
 **`forwardHostOnboarding` / `theme`** — suppress the first-run wizard inside the container. A valid login on the host is *not* enough on its own: Claude Code shows the theme picker (and other onboarding dialogs) whenever fields like `theme`, `firstStartTime`, or `tipsHistory` are absent from `~/.claude.json`. With `forwardHostOnboarding=true` (default), `postCreate.sh` copies those wizard-state fields from the host into the container, and `postStart.sh` idempotently nachzieht missing ones on every start (also fixes containers created by older Feature versions that did not write them). `theme` defaults to empty so the host's wizard choice is preserved; set it explicitly to override (useful for matching the IDE's color scheme regardless of what was picked on the host). As a final safety net, if `theme` would still be empty after all merges — host has no `.claude.json`, option not set — `postStart.sh` forces it to `"dark"` so the picker is guaranteed not to appear.
 
+**`claudeMd` / `hostClaudeMerge`** — synthesize `~/.claude/CLAUDE.md` (user-level memory loaded by every `claude` session) inside the container from up to two sources, written in this order:
+
+1. `claudeMd` (string, default `""`) — literal markdown injected as the first block. Useful for container-specific instructions you do not want to commit to the host's memory.
+2. `hostClaudeMerge` (boolean, default `true`) — when the host's `~/.claude/CLAUDE.md` is readable via the bind mount, its content is appended after the `claudeMd` block, separated by a blank line.
+
+Both empty/absent → the Feature does not touch any existing `~/.claude/CLAUDE.md` in the container. With `claudeMd=""` and `hostClaudeMerge=true`, the host file is mirrored verbatim into the container. Re-applied on every `postStart` with a diff-check, so identical content is a no-op but **container-side edits to `~/.claude/CLAUDE.md` will be overwritten on the next start whenever the computed body differs** (intentional, analogous to credential refresh). If you want the container's copy to be authoritative once written, set both options to neutralize the helper: `claudeMd=""` and `hostClaudeMerge=false`.
+
 ## Known upstream issues
 
 - **`remoteControlServer` may fail on Claude Code 2.1.98** — the session-creation API rejects the v2.1.98 payload with HTTP 400 *"Extra inputs are not permitted"* ([anthropics/claude-code#45975](https://github.com/anthropics/claude-code/issues/45975)). The daemon spawns correctly, but the bridge to claude.ai fails. Awaiting Anthropic fix.
