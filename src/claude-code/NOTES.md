@@ -25,6 +25,8 @@ Container lifecycle:
                ── permissions.defaultMode + remoteControlAtStartup +
                   skipAutoPermissionPrompt / skipDangerousModePermissionPrompt
                   in ~/.claude/settings.json
+               ── useHostStatusbar: mirror host statusLine into settings.json
+                  + symlink referenced ~/.claude/ scripts from the host mount
                ── optional: spawn `claude remote-control --spawn worktree` daemon
 ```
 
@@ -75,6 +77,7 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 | Host account switched (different `userID`) | `postStart` merges the new account fields into the existing `.claude.json` without losing workspace trust + remote-control settings. |
 | Workspace trust dialog | `postStart` writes `hasTrustDialogAccepted=true` + `hasCompletedProjectOnboarding=true` under `.projects[<path>]` for every immediate subdir of `/workspaces` — Claude checks trust per exact-path against the cwd, so the `/workspaces` parent itself is intentionally **not** added (would be a dead entry), and every repo opened from `/workspaces/*` stays trusted. |
 | Concurrent reads during token refresh | `postStart.sh` writes (credential refresh, `.claude.json` patch, `settings.json` patch) go through a `mktemp` + atomic `mv` helper on the same filesystem. The initial install in `postCreate.sh` uses plain `cp` / shell redirects after the host mount has been validated. |
+| Host status-line script | With `useHostStatusbar=true`, `postStart` mirrors the host's `settings.json` `statusLine` into the container and symlinks any `~/.claude/`-scoped script from the read-only mount, so the unchanged command runs. Strict mirror: `false` or a host without `statusLine` removes the key. Only `~/.claude/` paths are linked — absolute host-home paths are not resolved. A pre-existing regular file at the link target is never overwritten. |
 
 ## Configuration option notes
 
@@ -98,6 +101,8 @@ In that mode `${localEnv:HOME}` is `/home/<wsl-user>` (the WSL home where Claude
 2. `hostClaudeMerge` (boolean, default `true`) — when the host's `~/.claude/CLAUDE.md` is readable via the bind mount, its content is appended after the `claudeMd` block, separated by a blank line.
 
 Both empty/absent → the Feature does not touch any existing `~/.claude/CLAUDE.md` in the container. With `claudeMd=""` and `hostClaudeMerge=true`, the host file is mirrored verbatim into the container. Re-applied on every `postStart` with a diff-check, so identical content is a no-op but **container-side edits to `~/.claude/CLAUDE.md` will be overwritten on the next start whenever the computed body differs** (intentional, analogous to credential refresh). If you want the container's copy to be authoritative once written, set both options to neutralize the helper: `claudeMd=""` and `hostClaudeMerge=false`.
+
+**`useHostStatusbar`** — defaults to `true`. Claude Code's status line lives under `statusLine` in `~/.claude/settings.json` (typically `{ "type": "command", "command": "~/.claude/statusline.sh" }`). When enabled, `postStart.sh` mirrors the host's `statusLine` into the container's `settings.json` and, for any script referenced via `~/.claude/...` or `$HOME/.claude/...`, creates a symlink `~/.claude/<name>` → `/host_claude/.claude/<name>` so the unchanged command resolves against the read-only host mount. The symlink target is the absolute mount path and is recreated idempotently on every `postStart` (self-healing). The behavior is a strict mirror of the host: with `useHostStatusbar=false`, or when the host has no `statusLine`, the key is removed from the container settings. **Scope limitation:** only scripts under `~/.claude/` are linked. A `command` that points at an absolute host-home path (`/home/<hostuser>/.claude/...`), runs `npx`, or is an inline shell snippet is still copied verbatim, but no symlink is created — an absolute host path will not resolve inside the container. A pre-existing regular file at the symlink target is left untouched (only a warning is logged).
 
 ## Known upstream issues
 
