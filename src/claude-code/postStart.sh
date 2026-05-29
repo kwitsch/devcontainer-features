@@ -21,6 +21,7 @@ SCRIPT_TAG="claude-refresh"
 HOST_DIR="${HOST_CLAUDE_MOUNT:-/host_claude}"
 HOST_CREDS="${HOST_DIR}/.claude/.credentials.json"
 HOST_JSON="${HOST_DIR}/.claude.json"
+HOST_SETTINGS="${HOST_DIR}/.claude/settings.json"
 
 # --- Prerequisites --------------------------------------------------------
 command -v jq >/dev/null 2>&1 || { warn "jq not found — skipping"; exit 0; }
@@ -226,9 +227,30 @@ else
     new_settings="$(printf '%s' "$new_settings" | jq 'del(.remoteControlAtStartup)')"
 fi
 
+# statusLine: strikte Spiegelung des Host-Zustands.
+#   useHostStatusbar=true + Host hat statusLine -> uebernehmen + Scripts linken
+#   useHostStatusbar=true + Host ohne statusLine -> entfernen
+#   useHostStatusbar=false                       -> entfernen
+USE_HOST_STATUSBAR="${CLAUDE_USE_HOST_STATUSBAR:-true}"
+host_statusline=""
+if [[ "$USE_HOST_STATUSBAR" == "true" && -r "$HOST_SETTINGS" ]] && \
+   jq -e . "$HOST_SETTINGS" >/dev/null 2>&1; then
+    host_statusline="$(jq -c '.statusLine // empty' "$HOST_SETTINGS" 2>/dev/null || true)"
+fi
+
+if [[ -n "$host_statusline" ]]; then
+    new_settings="$(printf '%s' "$new_settings" | \
+        jq --argjson sl "$host_statusline" '.statusLine = $sl')"
+    # Script(s) aus dem command verlinken (nur ~/.claude/-Pfade).
+    sl_command="$(printf '%s' "$host_statusline" | jq -r '.command // empty' 2>/dev/null || true)"
+    link_host_statusline_scripts "$sl_command"
+else
+    new_settings="$(printf '%s' "$new_settings" | jq 'del(.statusLine)')"
+fi
+
 if [[ "$(printf '%s' "$cur_settings" | jq -S .)" != \
       "$(printf '%s' "$new_settings" | jq -S .)" ]]; then
-    log "patching ${TARGET_SETTINGS} (defaultMode=${DEFAULT_MODE:-<unchanged>}, remoteControl=${REMOTE_CONTROL})"
+    log "patching ${TARGET_SETTINGS} (defaultMode=${DEFAULT_MODE:-<unchanged>}, remoteControl=${REMOTE_CONTROL}, useHostStatusbar=${USE_HOST_STATUSBAR})"
     tmp_file="$(mktemp)"
     printf '%s\n' "$new_settings" > "$tmp_file"
     install_for_target "$tmp_file" "$TARGET_SETTINGS" 600
